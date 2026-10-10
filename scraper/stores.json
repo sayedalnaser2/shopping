@@ -2,7 +2,7 @@
   "_note": "search_url uses {q} for the URL-encoded query. Hosts were found via web search; the search paths are guesses - verify in a browser.",
   "lulu":      { "enabled": true,  "search_url": "https://gcc.luluhypermarket.com/en-bh/search/?q={q}" },
   "carrefour": { "enabled": true,  "search_url": "https://www.hypermax.com.bh/mafbhr/en/search?keyword={q}" },
-  "ramez":     { "enabled": false, "search_url": "https://REPLACE-WITH-RAMEZ-SITE/search?q={q}" },
+  "ramez":     { "enabled": true,  "search_url": "https://ramezshopping.com/search?q={q}" },
   "jazira":    { "enabled": true,  "search_url": "https://aljazirasupermarkets.com/search?q={q}" },
   "megamart":  { "enabled": false, "search_url": "https://www.megamart.bh/search?q={q}" }
 }
