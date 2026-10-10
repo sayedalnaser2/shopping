@@ -2,6 +2,14 @@
   const { STORES, PRODUCTS } = window;
   const $ = (id) => document.getElementById(id);
   const fmt = (n) => n.toFixed(3) + " BD";
+  const live = window.LIVE_PRICES;
+  if (live) {
+    for (const [id, byStore] of Object.entries(live.prices))
+      if (PRODUCTS[id]) for (const s of STORES) if (s.id in byStore) PRODUCTS[id].prices[s.id] = byStore[s.id];
+  }
+  $("notice").innerHTML = live
+    ? `Live prices last updated <strong>${new Date(live.updated).toLocaleString()}</strong>. Items the bot couldn't find fall back to sample estimates.`
+    : `⚠️ Prices shown are <strong>sample estimates</strong>. Run the price bot to fetch live prices.`;
   let cart = {};
   try { cart = JSON.parse(localStorage.getItem("cart") || "{}"); } catch (e) {}
   const save = () => { try { localStorage.setItem("cart", JSON.stringify(cart)); } catch (e) {} };
