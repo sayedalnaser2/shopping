@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bahrain Price Compare</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header>
+  <h1>🛒 Bahrain Price Compare</h1>
+  <p>Compare supermarket prices &amp; find the cheapest place for your basket</p>
+</header>
+<p class="notice">⚠️ Prices shown are <strong>sample estimates</strong> for demo. Edit <code>data.js</code> with real shelf prices.</p>
+<main>
+  <section id="catalog">
+    <div class="filters">
+      <input id="search" type="search" placeholder="Search products…" autocomplete="off">
+      <select id="category"></select>
+    </div>
+    <div id="products"></div>
+  </section>
+  <aside id="cart">
+    <h2>Your Cart <span id="count"></span></h2>
+    <div id="cart-items"></div>
+    <div id="results"></div>
+  </aside>
+</main>
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
