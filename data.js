@@ -3,7 +3,7 @@
 // Store order: [lulu, carrefour, ramez, jazira, megamart]
 window.STORES = [
   { id: "lulu", name: "Lulu Hypermarket" },
-  { id: "carrefour", name: "Carrefour" },
+  { id: "carrefour", name: "Carrefour (Hypermax)" },
   { id: "ramez", name: "Ramez" },
   { id: "jazira", name: "Al Jazira" },
   { id: "megamart", name: "Megamart" },

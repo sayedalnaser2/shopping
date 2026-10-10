@@ -1,7 +1,7 @@
 {
   "_note": "search_url uses {q} for the URL-encoded query. Verify/adjust each URL in a browser first - these are best guesses and may need changing.",
   "lulu":      { "enabled": true, "search_url": "https://www.luluhypermarket.com/en-bh/search?q={q}" },
-  "carrefour": { "enabled": true, "search_url": "https://www.carrefourbahrain.com/search?q={q}" },
+  "carrefour": { "enabled": true, "search_url": "https://www.hypermax.com.bh/mafbhr/en/search?keyword={q}" },
   "ramez":     { "enabled": true, "search_url": "https://www.ramezbahrain.com/search?q={q}" },
   "jazira":    { "enabled": true, "search_url": "https://www.aljazirasupermarket.com/search?q={q}" },
   "megamart":  { "enabled": true, "search_url": "https://www.megamart.bh/search?q={q}" }
