@@ -4,5 +4,5 @@
   "carrefour": { "enabled": true,  "search_url": "https://www.hypermax.com.bh/mafbhr/en/search?keyword={q}" },
   "ramez":     { "enabled": true,  "search_url": "https://ramezshopping.com/search?q={q}" },
   "jazira":    { "enabled": true,  "search_url": "https://www.aljazirasupermarkets.com/search?q={q}" },
-  "megamart":  { "enabled": false, "search_url": "https://www.megamart.bh/search?q={q}" }
+  "megamart":  { "enabled": true,  "search_url": "https://megamart.bh/search?q={q}" }
 }
