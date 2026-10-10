@@ -1,8 +1,8 @@
 {
-  "_note": "search_url uses {q} for the URL-encoded query. Verify/adjust each URL in a browser first - these are best guesses and may need changing.",
-  "lulu":      { "enabled": true, "search_url": "https://www.luluhypermarket.com/en-bh/search?q={q}" },
-  "carrefour": { "enabled": true, "search_url": "https://www.hypermax.com.bh/mafbhr/en/search?keyword={q}" },
-  "ramez":     { "enabled": true, "search_url": "https://www.ramezbahrain.com/search?q={q}" },
-  "jazira":    { "enabled": true, "search_url": "https://www.aljazirasupermarket.com/search?q={q}" },
-  "megamart":  { "enabled": true, "search_url": "https://www.megamart.bh/search?q={q}" }
+  "_note": "search_url uses {q} for the URL-encoded query. Hosts were found via web search; the search paths are guesses - verify in a browser.",
+  "lulu":      { "enabled": true,  "search_url": "https://gcc.luluhypermarket.com/en-bh/search/?q={q}" },
+  "carrefour": { "enabled": true,  "search_url": "https://www.hypermax.com.bh/mafbhr/en/search?keyword={q}" },
+  "ramez":     { "enabled": false, "search_url": "https://REPLACE-WITH-RAMEZ-SITE/search?q={q}" },
+  "jazira":    { "enabled": true,  "search_url": "https://aljazirasupermarkets.com/search?q={q}" },
+  "megamart":  { "enabled": false, "search_url": "https://www.megamart.bh/search?q={q}" }
 }
