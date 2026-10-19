@@ -1,5 +1,5 @@
 window.LIVE_PRICES = {
- "updated": "2026-10-18T08:04:38+00:00",
+ "updated": "2026-10-19T08:51:50+00:00",
  "coverage": {
   "jazira": "7/41",
   "megamart": "0/41"
