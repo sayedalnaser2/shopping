@@ -1,7 +1,7 @@
 window.LIVE_PRICES = {
- "updated": "2026-10-21T08:35:42+00:00",
+ "updated": "2026-10-22T08:37:47+00:00",
  "coverage": {
-  "jazira": "7/41",
+  "jazira": "6/41",
   "megamart": "0/41"
  },
  "prices": {
@@ -18,13 +18,10 @@ window.LIVE_PRICES = {
    "jazira": 2.625
   },
   "16": {
-   "jazira": 2.625
+   "jazira": 1.49
   },
   "29": {
    "jazira": 0.995
-  },
-  "30": {
-   "jazira": 1.195
   }
  }
 };
