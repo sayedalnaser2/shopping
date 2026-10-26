@@ -6,8 +6,9 @@
     "_why": "Cloudflare bot protection returns 403"
   },
   "carrefour": {
-    "enabled": true,
-    "search_url": "https://www.hypermax.com.bh/mafbhr/en/search?keyword={q}"
+    "enabled": false,
+    "search_url": "https://www.hypermax.com.bh/mafbhr/en/search?keyword={q}",
+    "_why": "times out for scripts even from a Bahrain connection (works in a normal browser)"
   },
   "ramez": {
     "enabled": true,
