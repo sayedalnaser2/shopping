@@ -5,14 +5,15 @@
   const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const meta = window.CATALOG_META || {};
   const PAGE = 60;
-  const SITE = { lulu: "https://gcc.luluhypermarket.com", carrefour: "https://www.hypermax.com.bh" };
+  const SITE = { lulu: "https://gcc.luluhypermarket.com", carrefour: "https://www.hypermax.com.bh", jazira: "https://www.aljazirasupermarkets.com",
+    megamart: "https://megamart.bh", ramez: "https://ramezshopping.com" };
+  const SLOT = { lulu: 5, carrefour: 6, jazira: 7, megamart: 8, ramez: 9 }; // position of each shop in a catalog row
 
-  // Catalog (catalog.js): every scraped product. Row = [id, name, size, category, image, lulu, hypermax]; store = [price, was, path]
+  // Catalog (catalog.js): every scraped product. Row = [id, name, size, category, image, lulu, hypermax, jazira, megamart, ramez]; store = [price, was, path]
   const ALL = (window.CATALOG || []).map((r) => {
     const prices = Object.fromEntries(STORES.map((s) => [s.id, null]));
     const links = {};
-    if (r[5]) { prices.lulu = r[5][0]; links.lulu = SITE.lulu + r[5][2]; }
-    if (r[6]) { prices.carrefour = r[6][0]; links.carrefour = SITE.carrefour + r[6][2]; }
+    for (const id in SLOT) { const c = r[SLOT[id]]; if (c) { prices[id] = c[0]; links[id] = SITE[id] + c[2]; } }
     return { id: r[0], name: r[1], size: r[2] || "", category: r[3], image: r[4], prices, links };
   });
   const byId = Object.fromEntries(ALL.map((p) => [p.id, p]));
@@ -23,7 +24,7 @@
 
   $("notice").innerHTML = (meta.updated ? `Prices updated <strong>${new Date(meta.updated).toLocaleString()}</strong>. ` : "") +
     `Prices come from the shops' websites (${ALL.length.toLocaleString()} products` +
-    (meta.matched ? `, ${meta.matched.toLocaleString()} found in more than one shop` : "") + `). ` +
+    (meta.multi ? `, ${meta.multi.toLocaleString()} found in more than one shop` : "") + `). ` +
     `Shops covered: ${ACTIVE.map((s) => esc(s.name)).join(", ")}. A price shows <em>n/a</em> when the shop does not sell the product.`;
 
   let cart = {};
