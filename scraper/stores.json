@@ -1,9 +1,29 @@
 {
   "_note": "search_url uses {q} for the URL-encoded query. 'parser' selects a custom reader in scrape.py; without it the generic JSON-LD reader is used.",
-  "lulu":      { "enabled": false, "search_url": "https://gcc.luluhypermarket.com/en-bh/search/?q={q}", "_why": "Cloudflare bot protection returns 403" },
-  "carrefour": { "enabled": false, "search_url": "https://www.hypermax.com.bh/mafbhr/en/search?keyword={q}", "_why": "returns an empty page to scripts" },
-  "ramez":     { "enabled": false, "search_url": "https://ramezshopping.com/search?q={q}", "_why": "JS app, API not mapped yet" },
-  "jazira":    { "enabled": true,  "parser": "wave", "headers": { "appid": "aljazira-web" },
-                 "search_url": "https://aljazira.api.wavegrocery.com/api/v3.1/products/search?pageNumber=0&pageSize=20&term={q}&collectionTypes%5B%5D=1" },
-  "megamart":  { "enabled": true,  "parser": "oscar", "search_url": "https://megamart.bh/en/search/?q={q}" }
+  "lulu": {
+    "enabled": false,
+    "search_url": "https://gcc.luluhypermarket.com/en-bh/search/?q={q}",
+    "_why": "Cloudflare bot protection returns 403"
+  },
+  "carrefour": {
+    "enabled": true,
+    "search_url": "https://www.hypermax.com.bh/mafbhr/en/search?keyword={q}"
+  },
+  "ramez": {
+    "enabled": true,
+    "search_url": "https://ramezshopping.com/search?q={q}"
+  },
+  "jazira": {
+    "enabled": true,
+    "parser": "wave",
+    "headers": {
+      "appid": "aljazira-web"
+    },
+    "search_url": "https://aljazira.api.wavegrocery.com/api/v3.1/products/search?pageNumber=0&pageSize=20&term={q}&collectionTypes%5B%5D=1"
+  },
+  "megamart": {
+    "enabled": true,
+    "parser": "oscar",
+    "search_url": "https://megamart.bh/en/search/?q={q}"
+  }
 }
