@@ -231,6 +231,7 @@ def main():
     ap.add_argument("--stores")
     ap.add_argument("--limit", type=int)
     ap.add_argument("--delay", type=float, default=1.0)
+    ap.add_argument("--debug", action="store_true", help="print what each search page returned")
     ap.add_argument("--out", default=str(ROOT / "prices.js"))
     a = ap.parse_args()
 
@@ -246,10 +247,15 @@ def main():
         found = 0
         print(f"== {sid}")
         for p in products:
-            q = urllib.parse.quote_plus(f'{p["name"]} {p["size"].split("(")[0].strip()}')
+            if sc.get("query") == "name":  # short search: product name only (some sites return nothing for long phrases)
+                q = urllib.parse.quote_plus(p["name"])
+            else:
+                q = urllib.parse.quote_plus(f'{p["name"]} {p["size"].split("(")[0].strip()}')
             url = sc["search_url"].format(q=q)
             html = browser.get(url) if sc.get("render") else fetch(url, headers=sc.get("headers"))
             cands = PARSERS[sc["parser"]](html, q) if sc.get("parser") else extract(html)
+            if a.debug:
+                print(f'  [{p["name"]}] {len(cands)} results, page {len(html)} chars; first: {cands[:3]}')
             m = best_match(p, cands)
             if m:
                 prices.setdefault(str(p["id"]), {})[sid] = round(m[2], 3)

@@ -14,7 +14,8 @@
     "enabled": true,
     "search_url": "https://ramezshopping.com/products/search/store/7263?text={q}",
     "render": true,
-    "parser": "text_cards"
+    "parser": "text_cards",
+    "query": "name"
   },
   "jazira": {
     "enabled": true,
