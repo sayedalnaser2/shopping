@@ -7,7 +7,7 @@ from playwright.sync_api import sync_playwright
 
 store = sys.argv[1]
 query = sys.argv[2] if len(sys.argv) > 2 else "milk"
-cfg = json.loads((Path(__file__).parent / "stores.json").read_text())[store]
+cfg = json.loads((Path(__file__).parent / "stores.json").read_text(encoding="utf-8"))[store]
 url = cfg["search_url"].format(q=urllib.parse.quote_plus(query))
 out = Path(f"probe_{store}"); out.mkdir(exist_ok=True)
 with sync_playwright() as pw:
@@ -16,9 +16,9 @@ with sync_playwright() as pw:
         global n
         try:
             if "json" in r.headers.get("content-type", ""):
-                n += 1; (out / f"json_{n}.txt").write_text(f"{r.status} {r.url}\n\n{r.text()[:20000]}")
+                n += 1; (out / f"json_{n}.txt").write_text(f"{r.status} {r.url}\n\n{r.text()[:20000]}", encoding="utf-8")
         except Exception: pass
     page.on("response", on_resp)
     page.goto(url, wait_until="domcontentloaded", timeout=60000); page.wait_for_timeout(8000)
-    (out / "page.html").write_text(page.content()); page.screenshot(path=str(out / "page.png"))
+    (out / "page.html").write_text(page.content(), encoding="utf-8"); page.screenshot(path=str(out / "page.png"))
     print("saved to", out, "-", n, "JSON responses;", url); b.close()

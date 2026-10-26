@@ -17,7 +17,7 @@ MIN_SCORE = 0.8
 
 
 def load_products():
-    rows = re.findall(r'^\s*\["([^"]+)",\s*"([^"]+)",\s*"([^"]+)",\s*\[', (ROOT / "data.js").read_text(), re.M)
+    rows = re.findall(r'^\s*\["([^"]+)",\s*"([^"]+)",\s*"([^"]+)",\s*\[', (ROOT / "data.js").read_text(encoding="utf-8"), re.M)
     return [{"id": i, "name": n, "size": s} for i, (n, s, _c) in enumerate(rows)]
 
 
@@ -211,7 +211,7 @@ def main():
     ap.add_argument("--out", default=str(ROOT / "prices.js"))
     a = ap.parse_args()
 
-    cfg = {k: v for k, v in json.loads(Path(a.config).read_text()).items() if not k.startswith("_")}
+    cfg = {k: v for k, v in json.loads(Path(a.config).read_text(encoding="utf-8")).items() if not k.startswith("_")}
     wanted = set(a.stores.split(",")) if a.stores else set(cfg)
     products = load_products()[: a.limit]
     browser = Browser() if any(c.get("render") and k in wanted and c.get("enabled", True) for k, c in cfg.items()) else None
@@ -237,7 +237,7 @@ def main():
     if browser:
         browser.close()
     out = {"updated": datetime.now(timezone.utc).isoformat(timespec="seconds"), "coverage": report, "prices": prices}
-    Path(a.out).write_text("window.LIVE_PRICES = " + json.dumps(out, indent=1) + ";\n")
+    Path(a.out).write_text("window.LIVE_PRICES = " + json.dumps(out, indent=1) + ";\n", encoding="utf-8")
     print("coverage:", report)
 
 
