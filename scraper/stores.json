@@ -1,17 +1,5 @@
 {
-  "_note": "search_url uses {q} for the URL-encoded query. 'parser' selects a custom reader in scrape.py; without it the generic JSON-LD reader is used.",
-  "lulu": {
-    "enabled": false,
-    "search_url": "https://gcc.luluhypermarket.com/en-bh/search/?q={q}",
-    "render": true,
-    "query": "name",
-    "_why": "Cloudflare blocks automated browsers (\"Sorry, you have been blocked\") even from a Bahrain home connection"
-  },
-  "carrefour": {
-    "enabled": false,
-    "search_url": "https://www.hypermax.com.bh/mafbhr/en/search?keyword={q}",
-    "render": true
-  },
+  "_note": "search_url uses {q} for the URL-encoded query. 'parser' selects a custom reader in scrape.py. 'render' uses Chromium. Lulu and Hypermax are not here: they block automated access.",
   "ramez": {
     "enabled": true,
     "search_url": "https://ramezshopping.com/products/search/store/7263?text={q}",
