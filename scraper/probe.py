@@ -19,6 +19,6 @@ with sync_playwright() as pw:
                 n += 1; (out / f"json_{n}.txt").write_text(f"{r.status} {r.url}\n\n{r.text()[:20000]}")
         except Exception: pass
     page.on("response", on_resp)
-    page.goto(url, wait_until="networkidle", timeout=60000); page.wait_for_timeout(3000)
+    page.goto(url, wait_until="domcontentloaded", timeout=60000); page.wait_for_timeout(8000)
     (out / "page.html").write_text(page.content()); page.screenshot(path=str(out / "page.png"))
     print("saved to", out, "-", n, "JSON responses;", url); b.close()

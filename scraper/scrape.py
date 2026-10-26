@@ -61,8 +61,8 @@ class Browser:
 
         page.on("response", on_resp)
         try:
-            page.goto(url, wait_until="networkidle", timeout=45000)
-            page.wait_for_timeout(1500)
+            page.goto(url, wait_until="domcontentloaded", timeout=45000)
+            page.wait_for_timeout(6000)  # let the app load its products (networkidle never settles on sites with trackers)
             html = page.content()
         except Exception as e:
             print(f"  ! browser failed {url}: {str(e)[:100]}", file=sys.stderr)
