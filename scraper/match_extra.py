@@ -19,15 +19,21 @@ def load(p, default=None):
     return json.loads(p.read_text(encoding="utf-8")) if p.exists() else default
 
 
+def norm(rows):
+    """Read '4*68GM' as '4x68GM' (only for matching; the shown name is untouched)."""
+    import re
+    return [{**r, "n": re.sub(r"(\d)\s*\*\s*(\d)", r"\1x\2", r["n"])} for r in rows]
+
+
 def main():
     store = sys.argv[1]
-    mine = M.prep(load(RAW / f"{store}.json"), None)
+    mine = M.prep(norm(load(RAW / f"{store}.json")), None)
     anchors = []
     for s in ORDER[:ORDER.index(store)]:
         rows = load(RAW / f"{s}.json")
         if rows is None:
             continue
-        for r in M.prep(rows, "s" if s == "hypermax" else None):
+        for r in M.prep(norm(rows), "s" if s == "hypermax" else None):
             r["_s"] = s
             anchors.append(r)
     taken = set()  # anchors already paired with this store in an earlier auto run are not reused
