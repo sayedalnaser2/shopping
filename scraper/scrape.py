@@ -142,7 +142,30 @@ def parse_oscar(html, _q=None):
     return out
 
 
-PARSERS = {"wave": parse_wave, "oscar": parse_oscar}
+def parse_text_cards(html, _q=None):
+    """Rendered card grids where each card reads: name, [rating], price 'x.xxxBHD', [old price], 'Add to Cart'.
+    Works from the visible text, so it survives markup changes (Ramez)."""
+    import html as htmllib
+    h = re.sub(r"<(script|style|noscript)\b.*?</\1>", " ", html, flags=re.S | re.I)
+    lines = [htmllib.unescape(x).strip() for x in re.sub(r"<[^>]+>", "\n", h).split("\n")]
+    lines = [x for x in lines if x]
+    out, start = [], 0
+    for i, ln in enumerate(lines):
+        if ln.lower() != "add to cart":
+            continue
+        block = lines[start:i]
+        start = i + 1
+        for j, b in enumerate(block):
+            m = re.fullmatch(r"(\d+(?:\.\d+)?)\s*BHD", b, re.I)
+            if m:
+                names = [x for x in block[:j] if not re.fullmatch(r"[-+]?\d+%|\(\d+\)|[\d.,\s]*", x)]
+                if names:
+                    out.append((names[-1], float(m.group(1))))
+                break
+    return out
+
+
+PARSERS = {"wave": parse_wave, "oscar": parse_oscar, "text_cards": parse_text_cards}
 
 
 UNITS = {"kg": 1000, "kgs": 1000, "g": 1, "gm": 1, "gms": 1, "gram": 1, "grams": 1, "gr": 1,
