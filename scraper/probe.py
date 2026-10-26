@@ -21,4 +21,15 @@ with sync_playwright() as pw:
     page.on("response", on_resp)
     page.goto(url, wait_until="domcontentloaded", timeout=60000); page.wait_for_timeout(8000)
     (out / "page.html").write_text(page.content(), encoding="utf-8"); page.screenshot(path=str(out / "page.png"))
+    html = page.content()
     print("saved to", out, "-", n, "JSON responses;", url); b.close()
+
+sys.path.insert(0, str(Path(__file__).parent))
+import scrape
+parser = cfg.get("parser")
+found = scrape.PARSERS[parser](html) if parser else scrape.extract(html)
+print(f"\nThe bot reads {len(found)} products from this page (reader: {parser or 'generic'}):")
+for name, price in found[:30]:
+    print(f"  {price:8.3f} BD  {name}")
+if not found:
+    print("  (nothing) - open", out / "page.png", "and compare with what the bot reads")
