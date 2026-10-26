@@ -3,45 +3,28 @@
   const $ = (id) => document.getElementById(id);
   const fmt = (n) => n.toFixed(3) + " BD";
   const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-  const live = window.LIVE_PRICES;
-  const meta = window.CATALOG_META;
+  const meta = window.CATALOG_META || {};
   const PAGE = 60;
   const SITE = { lulu: "https://gcc.luluhypermarket.com", carrefour: "https://www.hypermax.com.bh" };
 
-  // 1) Original sample products (data.js). Real prices from prices.js replace the placeholders.
-  const sample = window.PRODUCTS.map((p) => ({ ...p, id: String(p.id), image: null, links: {}, stores: STORES.map((s) => s.id) }));
-  const matchedL = new Set(), matchedH = new Set();
-  if (live) {
-    for (const [id, byStore] of Object.entries(live.prices || {})) {
-      const p = sample[Number(id)];
-      if (p) for (const s of STORES) if (s.id in byStore) p.prices[s.id] = byStore[s.id];
-    }
-    for (const [id, url] of Object.entries(live.images || {})) if (sample[Number(id)]) sample[Number(id)].image = url;
-    for (const m of Object.values(live.matched || {})) { if (m.l) matchedL.add(m.l); if (m.h) matchedH.add(m.h); }
-  }
-
-  // 2) Scraped catalog (catalog.js): every Lulu / Hypermax product. Row = [id, name, size, category, image, lulu, hypermax]
-  const catalog = (window.CATALOG || [])
-    .filter((r) => !(r[5] && matchedL.has(r[0].slice(1))) && !(r[6] && !r[5] && matchedH.has(r[0].slice(1))))
-    .map((r) => {
-      const prices = Object.fromEntries(STORES.map((s) => [s.id, null]));
-      const links = {};
-      if (r[5]) { prices.lulu = r[5][0]; links.lulu = SITE.lulu + r[5][2]; }
-      if (r[6]) { prices.carrefour = r[6][0]; links.carrefour = SITE.carrefour + r[6][2]; }
-      return { id: r[0], name: r[1], size: r[2] || "", category: r[3], image: r[4], prices, links, stores: ["lulu", "carrefour"] };
-    });
-
-  const ALL = sample.concat(catalog);
+  // Catalog (catalog.js): every scraped product. Row = [id, name, size, category, image, lulu, hypermax]; store = [price, was, path]
+  const ALL = (window.CATALOG || []).map((r) => {
+    const prices = Object.fromEntries(STORES.map((s) => [s.id, null]));
+    const links = {};
+    if (r[5]) { prices.lulu = r[5][0]; links.lulu = SITE.lulu + r[5][2]; }
+    if (r[6]) { prices.carrefour = r[6][0]; links.carrefour = SITE.carrefour + r[6][2]; }
+    return { id: r[0], name: r[1], size: r[2] || "", category: r[3], image: r[4], prices, links };
+  });
   const byId = Object.fromEntries(ALL.map((p) => [p.id, p]));
   for (const p of ALL) p._q = (p.name + " " + p.size).toLowerCase();
+  // Only shops we have prices for take part in the comparison.
+  const ACTIVE = STORES.filter((s) => ALL.some((p) => p.prices[s.id] != null));
+  for (const p of ALL) p.stores = ACTIVE.map((s) => s.id);
 
-  $("notice").innerHTML = (live
-    ? `Prices updated <strong>${new Date(live.updated).toLocaleString()}</strong>. `
-    : "") +
-    (meta
-      ? `Lulu &amp; Hypermax prices come from their websites (${meta.rows.toLocaleString()} products, ${meta.matched.toLocaleString()} found in both). `
-      : "") +
-    `Ramez, Al Jazira &amp; Megamart only cover the first ${sample.length} products, and some of those are still <strong>sample estimates</strong>.`;
+  $("notice").innerHTML = (meta.updated ? `Prices updated <strong>${new Date(meta.updated).toLocaleString()}</strong>. ` : "") +
+    `Prices come from the shops' websites (${ALL.length.toLocaleString()} products` +
+    (meta.matched ? `, ${meta.matched.toLocaleString()} found in more than one shop` : "") + `). ` +
+    `Shops covered: ${ACTIVE.map((s) => esc(s.name)).join(", ")}. A price shows <em>n/a</em> when the shop does not sell the product.`;
 
   let cart = {};
   try { cart = JSON.parse(localStorage.getItem("cart") || "{}"); } catch (e) {}
@@ -72,7 +55,7 @@
     const list = filtered.slice(0, shown);
     $("products").innerHTML = list.length ? list.map((p) => {
       const best = bestOf(p);
-      const chips = STORES.filter((s) => p.stores.includes(s.id)).map((s) => {
+      const chips = ACTIVE.filter((s) => p.stores.includes(s.id)).map((s) => {
         const v = p.prices[s.id];
         if (v == null) return `<span class="chip na">${esc(s.name)}: n/a</span>`;
         const cls = `chip ${v === best ? "best" : ""}`;
@@ -103,7 +86,7 @@
     }).join("") + `<p><button data-clear>Clear cart</button></p>`;
 
     // Per-store totals
-    const totals = STORES.map((s) => {
+    const totals = ACTIVE.map((s) => {
       let total = 0; const missing = [];
       for (const id of ids) {
         const v = byId[id].prices[s.id];
@@ -118,7 +101,7 @@
     let splitTotal = 0; const byStore = {}; const unpriced = [];
     for (const id of ids) {
       const p = byId[id];
-      const s = STORES.filter((s) => p.prices[s.id] != null).sort((a, b) => p.prices[a.id] - p.prices[b.id])[0];
+      const s = ACTIVE.filter((s) => p.prices[s.id] != null).sort((a, b) => p.prices[a.id] - p.prices[b.id])[0];
       if (!s) { unpriced.push(p.name); continue; }
       splitTotal += p.prices[s.id] * cart[id];
       (byStore[s.name] ||= []).push(`${cart[id]}× ${p.name}`);
