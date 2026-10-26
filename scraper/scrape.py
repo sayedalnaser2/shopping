@@ -34,6 +34,48 @@ def fetch(url, retries=2, headers=None):
             time.sleep(2 * (a + 1))
 
 
+class Browser:
+    """Optional real-Chromium fetcher (pip install playwright; python -m playwright install chromium).
+    Returns the rendered HTML plus every JSON response the page loaded, as <script type=application/json>."""
+
+    def __init__(self):
+        try:
+            from playwright.sync_api import sync_playwright
+        except ImportError:
+            sys.exit("Chromium mode needs: pip install playwright && python -m playwright install chromium")
+        self.pw = sync_playwright().start()
+        import os
+        exe = os.environ.get("CHROMIUM_PATH")
+        self.browser = self.pw.chromium.launch(executable_path=exe) if exe else self.pw.chromium.launch()
+        self.ctx = self.browser.new_context(locale="en-US")
+
+    def get(self, url):
+        page, blobs = self.ctx.new_page(), []
+
+        def on_resp(r):
+            try:
+                if "json" in r.headers.get("content-type", ""):
+                    blobs.append(r.text())
+            except Exception:
+                pass
+
+        page.on("response", on_resp)
+        try:
+            page.goto(url, wait_until="networkidle", timeout=45000)
+            page.wait_for_timeout(1500)
+            html = page.content()
+        except Exception as e:
+            print(f"  ! browser failed {url}: {str(e)[:100]}", file=sys.stderr)
+            html = ""
+        finally:
+            page.close()
+        return html + "".join(f'<script type="application/json">{b.replace("</", "<\\/")}</script>' for b in blobs)
+
+    def close(self):
+        self.browser.close()
+        self.pw.stop()
+
+
 def to_price(v):
     try:
         p = float(str(v).replace(",", "").strip())
@@ -172,6 +214,7 @@ def main():
     cfg = {k: v for k, v in json.loads(Path(a.config).read_text()).items() if not k.startswith("_")}
     wanted = set(a.stores.split(",")) if a.stores else set(cfg)
     products = load_products()[: a.limit]
+    browser = Browser() if any(c.get("render") and k in wanted and c.get("enabled", True) for k, c in cfg.items()) else None
     prices = {}  # product id -> store -> price
     report = {}
     for sid, sc in cfg.items():
@@ -181,7 +224,8 @@ def main():
         print(f"== {sid}")
         for p in products:
             q = urllib.parse.quote_plus(f'{p["name"]} {p["size"].split("(")[0].strip()}')
-            html = fetch(sc["search_url"].format(q=q), headers=sc.get("headers"))
+            url = sc["search_url"].format(q=q)
+            html = browser.get(url) if sc.get("render") else fetch(url, headers=sc.get("headers"))
             cands = PARSERS[sc["parser"]](html, q) if sc.get("parser") else extract(html)
             m = best_match(p, cands)
             if m:
@@ -190,6 +234,8 @@ def main():
                 print(f'  {p["name"]} {p["size"]} -> {m[1]} = {m[2]:.3f} (score {m[0]:.2f})')
             time.sleep(a.delay)
         report[sid] = f"{found}/{len(products)}"
+    if browser:
+        browser.close()
     out = {"updated": datetime.now(timezone.utc).isoformat(timespec="seconds"), "coverage": report, "prices": prices}
     Path(a.out).write_text("window.LIVE_PRICES = " + json.dumps(out, indent=1) + ";\n")
     print("coverage:", report)

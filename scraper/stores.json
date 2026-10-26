@@ -8,11 +8,12 @@
   "carrefour": {
     "enabled": false,
     "search_url": "https://www.hypermax.com.bh/mafbhr/en/search?keyword={q}",
-    "_why": "times out for scripts even from a Bahrain connection (works in a normal browser)"
+    "render": true
   },
   "ramez": {
     "enabled": true,
-    "search_url": "https://ramezshopping.com/search?q={q}"
+    "search_url": "https://ramezshopping.com/products/search/store/7263?text={q}",
+    "render": true
   },
   "jazira": {
     "enabled": true,
