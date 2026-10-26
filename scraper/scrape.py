@@ -127,7 +127,20 @@ def parse_wave(body, _q=None):
         prods = json.loads(body)["data"]["products"]
     except (ValueError, KeyError, TypeError):
         return []
-    return [(x["name"], x["finalPrice"] / 1000) for x in prods if x.get("available") and x.get("finalPrice")]
+    return [(x["name"], x["finalPrice"] / 1000, pick_image(x)) for x in prods if x.get("available") and x.get("finalPrice")]
+
+
+def pick_image(d):
+    """Best-effort product picture URL from a JSON product dict (None if there isn't one)."""
+    for k in ("imageUrl", "image", "imageURL", "thumbnail", "thumbnailUrl", "img", "images"):
+        v = d.get(k)
+        if isinstance(v, list) and v:
+            v = v[0]
+        if isinstance(v, dict):
+            v = v.get("url") or v.get("src")
+        if isinstance(v, str) and v.startswith(("http://", "https://", "//")):
+            return "https:" + v if v.startswith("//") else v
+    return None
 
 
 def parse_oscar(html, _q=None):
@@ -138,7 +151,13 @@ def parse_oscar(html, _q=None):
         i = re.search(r'class="intiger">(\d+)</span>', blk)
         d = re.search(r'class="decimal">(\.\d+)</span>', blk)
         if n and i and d:
-            out.append((n.group(1).strip(), float(i.group(1) + d.group(1))))
+            im = re.search(r'<img[^>]+(?:data-src|src)="([^"]+)"', blk) or re.search(r'<img[^>]+(?:data-src|src)="([^"]+)"', blk)
+            img = im.group(1) if im else None
+            if img and img.startswith("/"):
+                img = "https://megamart.bh" + img
+            if img and not img.startswith("http"):
+                img = None
+            out.append((n.group(1).strip(), float(i.group(1) + d.group(1)), img))
     return out
 
 
@@ -221,7 +240,8 @@ def score(product, cand):
 
 
 def best_match(product, cands):
-    best = max(((score(product, n), n, p) for n, p in cands), default=None)
+    """cands: (name, price) or (name, price, image_url). Returns (score, name, price, image_url|None)."""
+    best = max(((score(product, c[0]), c[0], c[1], c[2] if len(c) > 2 else None) for c in cands), default=None)
     return best if best and best[0] >= MIN_SCORE else None
 
 
@@ -241,6 +261,12 @@ def main():
     browser = Browser() if any(c.get("render") and k in wanted and c.get("enabled", True) for k, c in cfg.items()) else None
     prices = {}  # product id -> store -> price
     report = {}
+    try:
+        _old = json.loads(Path(a.out).read_text(encoding="utf-8").split("=", 1)[1].rstrip().rstrip(";"))
+    except Exception:
+        _old = {}
+    images = dict(_old.get("images", {}))  # product id -> picture URL; only filled in when missing
+    matched = dict(_old.get("matched", {}))
     for sid, sc in cfg.items():
         if sid not in wanted or not sc.get("enabled", True):
             continue
@@ -259,6 +285,8 @@ def main():
             m = best_match(p, cands)
             if m:
                 prices.setdefault(str(p["id"]), {})[sid] = round(m[2], 3)
+                if m[3] and str(p["id"]) not in images:
+                    images[str(p["id"])] = m[3]
                 found += 1
                 print(f'  {p["name"]} {p["size"]} -> {m[1]} = {m[2]:.3f} (score {m[0]:.2f})')
             time.sleep(a.delay)
@@ -283,7 +311,7 @@ def main():
         stamps = {}
     now = datetime.now(timezone.utc).isoformat(timespec="seconds")
     stamps.update({sid: now for sid in ran})
-    out = {"store_updated": stamps, "updated": datetime.now(timezone.utc).isoformat(timespec="seconds"), "coverage": report, "prices": prices}
+    out = {"store_updated": stamps, "updated": datetime.now(timezone.utc).isoformat(timespec="seconds"), "coverage": report, "prices": prices, "images": images, "matched": matched}
     Path(a.out).write_text("window.LIVE_PRICES = " + json.dumps(out, indent=1) + ";\n", encoding="utf-8")
     print("coverage:", report)
 

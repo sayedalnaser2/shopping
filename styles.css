@@ -30,3 +30,12 @@ aside h2{margin:0 0 10px;font-size:1.1rem}
 table{width:100%;border-collapse:collapse;font-size:.88rem;margin-top:8px}
 td,th{padding:5px 2px;text-align:left;border-bottom:1px solid var(--line)}td:last-child,th:last-child{text-align:right}
 .warn{color:#c77a00;font-size:.8rem}
+
+.product{display:flex;gap:12px;align-items:flex-start}
+.product .info{flex:1;min-width:0}
+.pic{width:72px;height:72px;flex:none;object-fit:contain;border-radius:8px;background:#fff;border:1px solid var(--line)}
+.pic.none{display:flex;align-items:center;justify-content:center;font-size:1.6rem;background:var(--bg);color:var(--muted)}
+.row .pic{width:40px;height:40px;font-size:1rem}
+.row .nm{flex:1;min-width:0}
+a.chip{text-decoration:none;color:inherit}a.chip:hover{text-decoration:underline}
+.found{color:var(--muted);font-size:.85rem;margin:0 0 8px}
