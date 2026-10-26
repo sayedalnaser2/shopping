@@ -1,10 +1,13 @@
 window.LIVE_PRICES = {
- "updated": "2026-10-10T12:44:12+00:00",
+ "updated": "2026-10-26T08:54:15+00:00",
  "coverage": {
   "jazira": "6/41",
-  "megamart": "4/41"
+  "megamart": "0/41"
  },
  "prices": {
+  "4": {
+   "jazira": 1.575
+  },
   "8": {
    "jazira": 1.175
   },
@@ -15,23 +18,10 @@ window.LIVE_PRICES = {
    "jazira": 2.625
   },
   "16": {
-   "jazira": 1.59,
-   "megamart": 2.075
+   "jazira": 1.49
   },
   "29": {
-   "jazira": 0.995
-  },
-  "30": {
-   "jazira": 1.195
-  },
-  "6": {
-   "megamart": 6.175
-  },
-  "38": {
-   "megamart": 2.705
-  },
-  "39": {
-   "megamart": 1.525
+   "jazira": 0.89
   }
  }
 };
