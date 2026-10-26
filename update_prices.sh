@@ -1,10 +1,4 @@
 #!/usr/bin/env bash
-# One-click price update for Mac/Linux.
-set -e
+# One-click price download for Mac/Linux. No git account needed.
 cd "$(dirname "$0")"
-git pull
-python3 scraper/scrape.py --stores ramez,jazira,megamart
-git add -A
-git commit -m "update prices" || echo "nothing new to save"
-git push
-echo "Done. Open index.html to see the new prices."
+python3 scraper/scrape.py --stores ramez,jazira,megamart && echo "Done. Prices saved to prices.js - open index.html"
