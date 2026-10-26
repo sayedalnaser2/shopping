@@ -265,7 +265,25 @@ def main():
         report[sid] = f"{found}/{len(products)}"
     if browser:
         browser.close()
-    out = {"updated": datetime.now(timezone.utc).isoformat(timespec="seconds"), "coverage": report, "prices": prices}
+    # keep earlier prices (and timestamps) of stores not run this time
+    ran = set(report)
+    try:
+        old = json.loads(Path(a.out).read_text(encoding="utf-8").split("=", 1)[1].rstrip().rstrip(";"))
+    except Exception:
+        old = None
+    if old:
+        for pid, by in old.get("prices", {}).items():
+            for sid, v in by.items():
+                if sid not in ran:
+                    prices.setdefault(pid, {})[sid] = v
+        for sid, c in old.get("coverage", {}).items():
+            report.setdefault(sid, c)
+        stamps = {**old.get("store_updated", {})}
+    else:
+        stamps = {}
+    now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    stamps.update({sid: now for sid in ran})
+    out = {"store_updated": stamps, "updated": datetime.now(timezone.utc).isoformat(timespec="seconds"), "coverage": report, "prices": prices}
     Path(a.out).write_text("window.LIVE_PRICES = " + json.dumps(out, indent=1) + ";\n", encoding="utf-8")
     print("coverage:", report)
 
