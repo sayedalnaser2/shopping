@@ -3,30 +3,62 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#c8102e">
 <title>Bahrain Price Compare</title>
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-<header>
-  <h1>🛒 Bahrain Price Compare</h1>
-  <p>Compare supermarket prices &amp; find the cheapest place for your basket</p>
+<header class="bar">
+  <div class="bar-in">
+    <a class="logo" href="./" aria-label="Bahrain Price Compare">🛒 <span>Price Compare</span></a>
+    <div class="searchbox">
+      <input id="search" type="search" placeholder="Search 50,000+ products…  (e.g. nido milk 1.8kg)" autocomplete="off" aria-label="Search products">
+      <button id="clear-search" class="icon" type="button" aria-label="Clear search" hidden>✕</button>
+    </div>
+    <button id="theme" class="icon" type="button" aria-label="Toggle dark mode" title="Dark / light">🌓</button>
+    <button id="open-cart" class="cartbtn" type="button" aria-label="Open cart">🧺 <span id="count-badge">0</span></button>
+  </div>
 </header>
-<p class="notice" id="notice"></p>
+
+<section class="hero" id="hero"><p class="notice" id="notice"></p><div class="stats" id="stats"></div></section>
+
 <main>
   <section id="catalog">
-    <div class="filters">
-      <input id="search" type="search" placeholder="Search products…" autocomplete="off">
-      <select id="category"></select>
+    <div class="toolbar">
+      <div class="row1">
+        <select id="category" aria-label="Category"></select>
+        <select id="sort" aria-label="Sort">
+          <option value="rel">Sort: Best match</option>
+          <option value="save">Biggest saving (BD)</option>
+          <option value="savepct">Biggest saving (%)</option>
+          <option value="disc">Biggest discount (was → now)</option>
+          <option value="low">Price: low to high</option>
+          <option value="high">Price: high to low</option>
+          <option value="az">Name A–Z</option>
+        </select>
+        <button id="reset" type="button" class="ghost">Reset</button>
+      </div>
+      <div class="chips" id="store-chips" aria-label="Only show products sold at"></div>
+      <div class="chips" id="toggles">
+        <label class="tog"><input type="checkbox" id="f-multi"> Compare‑able (2+ shops)</label>
+        <label class="tog"><input type="checkbox" id="f-sale"> On sale</label>
+        <label class="tog"><input type="checkbox" id="f-fav"> ♥ Favourites <span id="fav-count"></span></label>
+        <label class="tog price">BD <input id="pmin" type="number" min="0" step="0.1" placeholder="min"> – <input id="pmax" type="number" min="0" step="0.1" placeholder="max"></label>
+      </div>
     </div>
-    <p class="found" id="found"></p>
-    <div id="products"></div>
+    <p class="found" id="found" aria-live="polite"></p>
+    <div id="products" class="grid"></div>
+    <div id="sentinel"></div>
   </section>
-  <aside id="cart">
-    <h2>Your Cart <span id="count"></span></h2>
+
+  <aside id="cart" aria-label="Cart">
+    <div class="cart-head"><h2>Your Cart <span id="count"></span></h2><button id="close-cart" class="icon" type="button" aria-label="Close cart">✕</button></div>
     <div id="cart-items"></div>
     <div id="results"></div>
   </aside>
 </main>
+<div id="scrim" hidden></div>
+<div id="toast" role="status"></div>
 <script src="data.js"></script>
 <script src="catalog.js"></script>
 <script src="app.js"></script>

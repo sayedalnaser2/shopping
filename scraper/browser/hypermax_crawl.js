@@ -11,6 +11,16 @@
     for (const m of h.matchAll(/(?:https?:)?(?:\\*\/){2}cdn\.mafrservices\.com[^"'\s\\]*?\/(\d+)_main\.(?:jpg|png|jpeg|webp)/g)) {
       let u = m[0].replace(/\\+\//g, "/"); if (u.startsWith("//")) u = "https:" + u; imgs[m[1]] = u;
     }
+    // Price = the text node that holds just "1.234 BHD". Reading the whole block's text glued neighbouring digits
+    // (pack counts, shade numbers, item codes) onto the price, e.g. "60" + "3.250" -> 603.25. Fixed 2026-10-27.
+    const priceIn = (d, c) => {
+      const w = d.createTreeWalker(c, 4), found = [];
+      for (let n = w.nextNode(); n && found.length < 2; n = w.nextNode()) {
+        const m = n.data.match(/^\s*(\d+\.\d{3})\s*(?:BHD)?\s*$/);
+        if (m) found.push(m);
+      }
+      return found;
+    };
     const d = new DOMParser().parseFromString(h, "text/html"), out = new Map();
     d.querySelectorAll('a[href*="/p/"]').forEach((a) => {
       const name = a.textContent.trim(), m = a.getAttribute("href").match(/\/p\/(\d+)/);
@@ -18,10 +28,10 @@
       let c = a.parentElement;
       for (let i = 0; i < 8 && c && !/BHD/.test(c.textContent); i++) c = c.parentElement;
       if (!c) return;
-      const t = c.textContent, pm = t.match(/(\d+\.\d{3})\s*BHD/);
+      const t = c.textContent, nodes = priceIn(d, c), pm = nodes[0] || t.match(/(\d+\.\d{3})\s*BHD/);
       if (!pm) return;
-      const was = t.slice(t.indexOf(pm[0]) + pm[0].length).match(/^\s*(\d+\.\d{3})/);
-      const size = t.slice(t.indexOf(name) + name.length, t.indexOf(pm[0])).replace(/\d+$/, "").trim();
+      const was = nodes[1] || (nodes.length ? null : t.slice(t.indexOf(pm[0]) + pm[0].length).match(/^\s*(\d+\.\d{3})/));
+      const size = t.slice(t.indexOf(name) + name.length, Math.max(t.indexOf(name) + name.length, t.indexOf(pm[0]))).replace(/\d+$/, "").trim();
       out.set(m[1], { i: m[1], n: name, s: size, p: parseFloat(pm[1]),
         w: was && parseFloat(was[1]) > parseFloat(pm[1]) ? parseFloat(was[1]) : null,
         c: cat, sc: sub, u: a.getAttribute("href").split("?")[0], im: imgs[m[1]] || null });

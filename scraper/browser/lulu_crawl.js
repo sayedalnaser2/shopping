@@ -19,6 +19,16 @@
     "electronics-medical-equipment", "electronics-gaming", "grocery-food-cupboard-breakfast-spreads",
     "grocery-food-cupboard-beverage", "grocery-food-cupboard-frozen-food", "grocery-food-cupboard-world-foods",
     "grocery-food-cupboard-frozen-food-ice-cream", "grocery-beauty-wellness-premium-perfumes"];
+  // Price = the text node that holds just "1.234 BHD". Reading the whole block's text glued neighbouring digits
+  // (pack counts, shade numbers, item codes) onto the price, e.g. "60" + "3.250" -> 603.25. Fixed 2026-10-27.
+  const priceIn = (d, c) => {
+    const w = d.createTreeWalker(c, 4), found = [];
+    for (let n = w.nextNode(); n && found.length < 2; n = w.nextNode()) {
+      const m = n.data.match(/^\s*(\d+\.\d{3})\s*(?:BHD)?\s*$/);
+      if (m) found.push(m);
+    }
+    return found;
+  };
   const parse = (d, cat) => {
     const out = new Map(), by = new Map();
     d.querySelectorAll('a[href*="/p/"]').forEach((a) => {
@@ -29,9 +39,9 @@
       const a = as[0]; let c = a;
       for (let i = 0; i < 8 && c && !/BHD/.test(c.textContent); i++) c = c.parentElement;
       if (!c) return;
-      const t = c.textContent, pm = t.match(/(\d+\.\d{3})\s*BHD/);
+      const t = c.textContent, nodes = priceIn(d, c), pm = nodes[0] || t.match(/(\d+\.\d{3})\s*BHD/);
       if (!pm) return;
-      const was = t.slice(t.indexOf(pm[0]) + pm[0].length).match(/^\s*(\d+\.\d{3})/);
+      const was = nodes[1] || (nodes.length ? null : t.slice(t.indexOf(pm[0]) + pm[0].length).match(/^\s*(\d+\.\d{3})/));
       let name = as.map((x) => x.textContent.trim()).sort((x, y) => y.length - x.length)[0];
       if (!name) name = t.slice(0, t.indexOf(pm[0])).replace(/^\d+/, "").trim();
       const im = [...c.querySelectorAll("img")].find((i) => !/hover image$/i.test(i.alt || "") && /\/products\//.test(i.getAttribute("src") || i.getAttribute("srcset") || ""));
