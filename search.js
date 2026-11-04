@@ -243,7 +243,7 @@
       }
       if (!e.size) {
         const fz = fuzzyTerms(t, 6);
-        for (const [dd, id] of fz) add(id, dd === 1 ? 0.62 : 0.5);
+        for (const [dd, id] of fz) add(id, dd === 1 ? 0.62 : 0.58);
         if (fz.length) { how = "fuzzy"; corrected = true; }
       }
       exps.push({ t, e, cap, how: how || "none", size: /^\d+(?:\.\d+)?(g|ml|pc|oz|lb|gal|cm|mm)$/.test(t) });
@@ -341,7 +341,7 @@
     const matched = new Set();
     for (const [id] of qTerms) matched.add(terms[id]);
     const fixes = exps.filter((x) => x.how === "fuzzy").map((x) => {
-      let best = null, bw = -1; for (const [id, w] of x.e) if (w > bw || (w === bw && df[id] > df[best])) { best = id; bw = w; }
+      let best = null; for (const [id] of x.e) if (best == null || df[id] > df[best]) best = id;
       return best == null ? x.t : terms[best];
     });
     let correctedText = null;
