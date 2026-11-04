@@ -38,14 +38,22 @@
     });
     return out;
   };
-  const data = new Map();
-  const crawl = async (id, top, name) => { // a category page lists at most ~1200 items, so also crawl its sub-categories
+  const data = new Map(), done = new Set();
+  const catIds = (h) => [...h.matchAll(/\/mafbhr\/en\/c\/([A-Za-z0-9_]+)/g)].map((m) => m[1]);
+  // a category page lists at most ~1200 items, so every sub-category is crawled too. Sub-categories are found from the
+  // links on each page, which also reaches the non-food side (ids NFBHR..., beauty, home, cleaning, baby, electronics).
+  const queue = [];
+  const crawl = async (id, top, name) => {
+    if (done.has(id)) return; done.add(id);
     const seen = new Set();
     for (let pg = 1; pg < 100; pg++) {
       const r = await fetch(`/mafbhr/en/c/${id}?currentPage=${pg}`);
       if (!r.ok) break;
+      const html = await r.text();
+      if (pg === 1 && top === "other") { const h = (new DOMParser().parseFromString(html, "text/html").querySelector("h1") || {}).textContent; if (h) { top = h.trim(); name = top; } }
+      if (pg === 1) catIds(html).forEach((c) => { if (!done.has(c)) queue.push([c, top, name]); });
       let fresh = 0;
-      parse(await r.text(), top, name).forEach((v, k) => { if (!seen.has(k)) { seen.add(k); fresh++; if (!data.has(k)) data.set(k, v); } });
+      parse(html, top, name).forEach((v, k) => { if (!seen.has(k)) { seen.add(k); fresh++; if (!data.has(k)) data.set(k, v); } });
       if (!fresh) break;
     }
   };
@@ -54,6 +62,12 @@
   for (const top of menu.foodCategories) {
     for (const n of walk(top)) await crawl(n.id, top.name, n.name);
     console.log(top.name, "-> total", data.size);
+  }
+  // every other category linked from the home page or found inside category pages (non-food)
+  catIds(await (await fetch("/mafbhr/en")).text()).forEach((c) => { if (!done.has(c)) queue.push([c, "other", c]); });
+  while (queue.length) {
+    const [id, top, name] = queue.shift(); await crawl(id, top, name);
+    if (done.size % 10 === 0) console.log("categories", done.size, "queue", queue.length, "-> total", data.size);
   }
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([JSON.stringify([...data.values()])], { type: "application/json" }));
