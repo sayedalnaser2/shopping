@@ -372,6 +372,22 @@
       list.push([score, d]);
     }
     list.sort((a, b) => b[0] - a[0] || a[1] - b[1]);
+    // What was the shopper most likely looking for? The category / sub-category that dominates the best matches is the "primary"
+    // one: its products come first ("milk" -> Dairy > Milk before condensed milk, milk chocolate or milk powder scoops), then the other choices.
+    let primary = null;
+    if (list.length >= 6) {
+      const w = new Map(); let tot = 0;
+      for (let k = 0; k < Math.min(60, list.length); k++) {
+        const p = docs[list[k][1]], key = p.category + "|" + (p.sub || ""), wt = 1 / (1 + k / 12);
+        w.set(key, (w.get(key) || 0) + wt); tot += wt;
+      }
+      let bestKey = null, bestW = 0; for (const [k, v] of w) if (v > bestW) { bestW = v; bestKey = k; }
+      if (bestKey && bestW / tot >= 0.4) {
+        const [cat, sub] = bestKey.split("|"); primary = { cat, sub };
+        for (const e of list) { const p = docs[e[1]]; if (p.category === cat && (p.sub || "") === sub) e[0] *= 1.8; }
+        list.sort((a, b) => b[0] - a[0] || a[1] - b[1]);
+      }
+    }
 
     const matched = new Set();
     for (const [id] of qTerms) matched.add(terms[id]);
@@ -384,7 +400,7 @@
       const raw = q.trim().split(/\s+/).filter((w) => w[0] !== "-");
       correctedText = exps.map((x, i) => (x.how === "fuzzy" ? fixes.shift() : raw.length === exps.length ? raw[i] : x.t)).join(" ");
     }
-    return { ids: list.map((x) => x[1]), terms: matched, words: pos, partial, corrected: correctedText, exact, intent: hasIntent ? intent : null };
+    return { ids: list.map((x) => x[1]), terms: matched, words: pos, partial, corrected: correctedText, exact, intent: hasIntent ? intent : null, primary };
   }
 
   /* ---------- suggestions ---------- */

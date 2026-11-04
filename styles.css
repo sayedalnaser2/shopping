@@ -148,3 +148,5 @@ tr.top td{font-weight:700;color:var(--good)}
 .tile:hover{border-color:var(--accent);transform:translateY(-1px)}
 .tile .ti{font-size:1.8rem;line-height:1.1}.tile b{font-size:.95rem}.tile small{color:var(--muted);font-size:.75rem}
 @media (max-width:640px){.catbar{top:53px}.tilegrid{grid-template-columns:repeat(2,1fr)}}
+
+.divider{grid-column:1/-1;margin:14px 0 2px;padding-top:12px;border-top:2px solid var(--line,#e5e7eb);font-size:1.05rem;font-weight:700;color:var(--muted,#6b7280)}

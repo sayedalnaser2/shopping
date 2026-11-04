@@ -167,8 +167,16 @@
   }
 
   function renderProducts(append) {
-    const list = filtered.slice(append ? shown - PAGE : 0, shown);
-    const html = list.map(card).join("");
+    const from = append ? shown - PAGE : 0;
+    const list = filtered.slice(from, shown);
+    // "what you searched for" first, then a heading, then the other choices
+    let split = -1;
+    const pr = lastRes && lastRes.primary;
+    if (pr && F.sort === "rel" && F.cat === "All" && !F.sub) {
+      let k = 0; while (k < filtered.length && filtered[k].category === pr.cat && (filtered[k].sub || "") === pr.sub) k++;
+      if (k >= 3 && k < filtered.length) split = k;
+    }
+    const html = list.map((p, j) => (from + j === split ? `<h2 class="divider">Other choices</h2>` : "") + card(p)).join("");
     if (append) $("products").insertAdjacentHTML("beforeend", html);
     else $("products").innerHTML = html || `<p class="empty" style="grid-column:1/-1">No products match. Try fewer words or press Reset.</p>`;
     $("found").innerHTML = `${filtered.length.toLocaleString()} product${filtered.length === 1 ? "" : "s"}` +
@@ -356,7 +364,7 @@
   function choose(i) {
     const x = sugg[i]; if (!x) return;
     if (x.type === "cat") { input.value = ""; F.q = ""; F.cat = x.cat; F.sub = x.sub || ""; closeSugg(); window.__catScroll = true; refresh(); $("catalog").scrollIntoView({ block: "start" }); return; }
-    input.value = x.text; F.q = x.text.trim(); remember(F.q); closeSugg(); refresh();
+    input.value = x.text; F.cat = "All"; F.sub = ""; F.q = x.text.trim(); remember(F.q); closeSugg(); refresh();
   }
   function move(delta) {
     if (box.hidden) { showSugg(); return; }
@@ -366,7 +374,7 @@
   }
   input.addEventListener("input", (e) => {
     clearTimeout(timer); showSugg();
-    timer = setTimeout(() => { F.q = e.target.value.trim(); refresh(); }, 140);
+    timer = setTimeout(() => { const v = e.target.value.trim(); if (v !== F.q) { F.cat = "All"; F.sub = ""; } F.q = v; refresh(); }, 140);
   });
   input.addEventListener("focus", showSugg);
   input.addEventListener("blur", () => { setTimeout(closeSugg, 120); remember(F.q); });
@@ -376,7 +384,7 @@
     else if (e.key === "Enter") {
       e.preventDefault();
       if (active >= 0 && !box.hidden) choose(active);
-      else { clearTimeout(timer); F.q = input.value.trim(); remember(F.q); closeSugg(); refresh(); input.blur(); }
+      else { clearTimeout(timer); if (input.value.trim() !== F.q) { F.cat = "All"; F.sub = ""; } F.q = input.value.trim(); remember(F.q); closeSugg(); refresh(); input.blur(); }
     } else if (e.key === "Escape") { if (!box.hidden) { closeSugg(); e.stopPropagation(); } }
   });
   box.addEventListener("mousedown", (e) => {
