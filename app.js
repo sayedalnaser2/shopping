@@ -27,7 +27,7 @@
       if (c[1] && c[1] > c[0]) { was[id] = c[1]; const d = (c[1] - c[0]) / c[1]; if (d > disc) { disc = d; discBD = c[1] - c[0]; } }
     }
     const spread = n > 1 ? max - min : 0;
-    return { id: r[0], name: r[1], size: r[2] || "", category: r[3], image: r[4], prices, was, links, n, min, max, cheapest, spread,
+    return { id: r[0], name: r[1], size: r[2] || "", category: r[3], sub: r[10] || "", image: r[4], prices, was, links, n, min, max, cheapest, spread,
       spreadPct: n > 1 && max > 0 ? spread / max : 0, suspect: n > 1 && min > 0 && max / min > 3, disc, discBD };
   });
   const byId = Object.fromEntries(ALL.map((p) => [p.id, p]));
@@ -45,7 +45,7 @@
     ACTIVE.map((s) => `<div class="stat"><b>${counts[s.id].toLocaleString()}</b><span><i style="background:${s.color}"></i>${esc(s.short)}</span></div>`).join("");
 
   /* ---------- state ---------- */
-  const F = { q: "", cat: "All", sort: "rel", stores: new Set(), multi: false, sale: false, fav: false, pmin: null, pmax: null };
+  const F = { q: "", cat: "All", sub: "", sort: "rel", stores: new Set(), multi: false, sale: false, fav: false, pmin: null, pmax: null };
   let cart = ls.get("cart", {});
   for (const id of Object.keys(cart)) if (!byId[id]) delete cart[id]; // product no longer in the catalog
   let favs = new Set(ls.get("favs", []).filter((id) => byId[id]));
@@ -53,8 +53,16 @@
   if (!cartStores.size) cartStores = new Set(ACTIVE.map((s) => s.id));
   const saveCart = () => { ls.set("cart", cart); };
 
-  const cats = ["All", ...[...new Set(ALL.map((p) => p.category))].sort()];
-  $("category").innerHTML = cats.map((c) => `<option>${esc(c)}</option>`).join("");
+  // Category tree (taxonomy.py): the same main categories and sub-categories for every shop
+  const CAT_ORDER = ["Fruit & Vegetables", "Meat & Seafood", "Dairy & Eggs", "Bakery", "Frozen", "Pantry", "Snacks & Sweets", "Beverages", "Baby",
+    "Personal Care", "Household", "Health & Wellness", "Pets", "Home & Kitchen", "Electronics", "Toys & Stationery", "Fashion & Luggage", "Other"];
+  const CAT_ICON = { "Fruit & Vegetables": "🥬", "Meat & Seafood": "🥩", "Dairy & Eggs": "🥛", Bakery: "🥖", Frozen: "🧊", Pantry: "🥫", "Snacks & Sweets": "🍫",
+    Beverages: "🥤", Baby: "🍼", "Personal Care": "🧴", Household: "🧽", "Health & Wellness": "💊", Pets: "🐾", "Home & Kitchen": "🍳", Electronics: "🔌",
+    "Toys & Stationery": "🧸", "Fashion & Luggage": "👜", Other: "📦" };
+  const present = new Set(ALL.map((p) => p.category));
+  const cats = ["All", ...CAT_ORDER.filter((c) => present.has(c)), ...[...present].filter((c) => !CAT_ORDER.includes(c)).sort()];
+  const SUBS = {};
+  for (const p of ALL) if (p.sub) (SUBS[p.category] = SUBS[p.category] || new Set()).add(p.sub);
   $("store-chips").innerHTML = `<span class="found" style="margin:0">Sold at:</span>` + ACTIVE.map((s) =>
     `<button type="button" class="sc" data-store="${s.id}" aria-pressed="false"><i style="background:${s.color}"></i>${esc(s.short)}</button>`).join("");
 
@@ -62,6 +70,7 @@
   function readHash() {
     const h = new URLSearchParams(location.hash.slice(1));
     F.q = h.get("q") || ""; F.cat = cats.includes(h.get("cat")) ? h.get("cat") : "All";
+    F.sub = F.cat !== "All" && SUBS[F.cat] && SUBS[F.cat].has(h.get("sub")) ? h.get("sub") : "";
     F.sort = ["rel", "save", "savepct", "disc", "low", "high", "az"].includes(h.get("sort")) ? h.get("sort") : "rel";
     F.multi = h.get("multi") === "1"; F.sale = h.get("sale") === "1";
     F.stores = new Set((h.get("at") || "").split(",").filter((x) => ACTIVE.some((s) => s.id === x)));
@@ -69,7 +78,7 @@
   }
   function writeHash() {
     const h = new URLSearchParams();
-    if (F.q) h.set("q", F.q); if (F.cat !== "All") h.set("cat", F.cat); if (F.sort !== "rel") h.set("sort", F.sort);
+    if (F.q) h.set("q", F.q); if (F.cat !== "All") h.set("cat", F.cat); if (F.sub) h.set("sub", F.sub); if (F.sort !== "rel") h.set("sort", F.sort);
     if (F.multi) h.set("multi", "1"); if (F.sale) h.set("sale", "1"); if (F.stores.size) h.set("at", [...F.stores].join(","));
     if (F.pmin != null) h.set("min", F.pmin); if (F.pmax != null) h.set("max", F.pmax);
     const s = h.toString();
@@ -77,7 +86,7 @@
   }
   function syncControls() {
     const sb = $("search"); if (document.activeElement !== sb || sb.value.trim() !== F.q) sb.value = F.q;
-    $("category").value = F.cat; $("sort").value = F.sort;
+    $("sort").value = F.sort;
     $("f-multi").checked = F.multi; $("f-sale").checked = F.sale; $("f-fav").checked = F.fav;
     $("pmin").value = F.pmin ?? ""; $("pmax").value = F.pmax ?? "";
     $("clear-search").hidden = !F.q;
@@ -95,10 +104,9 @@
     az: (a, b) => a.name.localeCompare(b.name),
   };
   let filtered = [], shown = PAGE;
-  let lastRes = null;
+  let lastRes = null, catCount = {}, subCount = {};
   function applyFilters() {
     const pass = (p) => {
-      if (F.cat !== "All" && p.category !== F.cat) return false;
       if (F.multi && p.n < 2) return false;
       if (F.sale && !p.disc) return false;
       if (F.fav && !favs.has(p.id)) return false;
@@ -108,9 +116,16 @@
       return true;
     };
     lastRes = F.q.trim() ? Search.search(F.q) : null;
-    let list = [];
-    if (lastRes) { for (const i of lastRes.ids) if (pass(ALL[i])) list.push(ALL[i]); } // already in best-match order
-    else list = ALL.filter(pass);
+    let base = [];
+    if (lastRes) { for (const i of lastRes.ids) if (pass(ALL[i])) base.push(ALL[i]); } // already in best-match order
+    else base = ALL.filter(pass);
+    // how many products each category / sub-category has under the current search and filters
+    catCount = {}; subCount = {};
+    for (const p of base) {
+      catCount[p.category] = (catCount[p.category] || 0) + 1;
+      if (p.category === F.cat) subCount[p.sub] = (subCount[p.sub] || 0) + 1;
+    }
+    let list = F.cat === "All" ? base : base.filter((p) => p.category === F.cat && (!F.sub || p.sub === F.sub));
     if (F.sort !== "rel") {
       if (F.sort === "save" || F.sort === "savepct") list = list.filter((p) => p.n > 1 && !p.suspect);
       if (F.sort === "disc") list = list.filter((p) => p.disc > 0);
@@ -156,7 +171,25 @@
       (lastRes && lastRes.partial && filtered.length ? ` · best matches first, then close matches that miss a word` : "");
     $("sentinel").innerHTML = filtered.length > shown ? `<button class="more" data-more>Show more (${(filtered.length - shown).toLocaleString()} left)</button>` : "";
   }
-  function refresh() { applyFilters(); syncControls(); writeHash(); renderProducts(); }
+  function renderCats() {
+    const total = Object.values(catCount).reduce((a, b) => a + b, 0);
+    const chip = (key, label, n, on, icon) => `<button type="button" class="cc${on ? " on" : ""}" data-cat="${esc(key)}"${n === 0 ? " disabled" : ""}>` +
+      `${icon ? `<span class="ci">${icon}</span>` : ""}${esc(label)}<em>${n.toLocaleString()}</em></button>`;
+    $("catrail").innerHTML = chip("All", "All", total, F.cat === "All", "🛍️") +
+      cats.slice(1).map((c) => chip(c, c, catCount[c] || 0, F.cat === c, CAT_ICON[c] || "📦")).join("");
+    const subs = F.cat !== "All" && SUBS[F.cat] ? [...SUBS[F.cat]].sort((a, b) => (/^other/i.test(a) - /^other/i.test(b)) || (subCount[b] || 0) - (subCount[a] || 0)) : [];
+    $("subrail").hidden = !subs.length;
+    $("subrail").innerHTML = subs.length ? `<button type="button" class="cc sub${F.sub ? "" : " on"}" data-sub="">All ${esc(F.cat)}<em>${(catCount[F.cat] || 0).toLocaleString()}</em></button>` +
+      subs.map((x) => `<button type="button" class="cc sub${F.sub === x ? " on" : ""}" data-sub="${esc(x)}"${(subCount[x] || 0) === 0 ? " disabled" : ""}>${esc(x)}<em>${(subCount[x] || 0).toLocaleString()}</em></button>`).join("") : "";
+    // the active chip scrolls into view on small screens
+    const on = $("catrail").querySelector(".on"); if (on && on.scrollIntoView && window.__catScroll) on.scrollIntoView({ block: "nearest", inline: "center" });
+    // home view: big category tiles while nothing is searched or filtered
+    const home = F.cat === "All" && !F.q.trim() && !F.multi && !F.sale && !F.fav && !F.stores.size && F.pmin == null && F.pmax == null;
+    $("tiles").hidden = !home;
+    if (home) $("tiles").innerHTML = `<h2>Shop by category</h2><div class="tilegrid">` + cats.slice(1).filter((c) => catCount[c]).map((c) =>
+      `<button type="button" class="tile" data-cat="${esc(c)}"><span class="ti">${CAT_ICON[c] || "📦"}</span><b>${esc(c)}</b><small>${(catCount[c] || 0).toLocaleString()} products</small></button>`).join("") + `</div>`;
+  }
+  function refresh() { applyFilters(); syncControls(); writeHash(); renderCats(); renderProducts(); }
 
   // Refresh one card in place (keeps the scroll position while adding to the cart).
   function updateCard(id) {
@@ -257,6 +290,8 @@
       $("fav-count").textContent = favs.size ? `(${favs.size})` : "";
       if (F.fav) refresh(); else updateCard(d.fav); return;
     }
+    if (d.cat != null) { F.cat = d.cat; F.sub = ""; window.__catScroll = true; refresh(); if (d.cat !== "All") $("catalog").scrollIntoView({ block: "start" }); return; }
+    if (d.sub != null && t.classList.contains("sub")) { F.sub = d.sub; refresh(); return; }
     if (d.store) { F.stores.has(d.store) ? F.stores.delete(d.store) : F.stores.add(d.store); refresh(); return; }
     if (d.cs) { cartStores.has(d.cs) ? cartStores.delete(d.cs) : cartStores.add(d.cs); if (!cartStores.size) cartStores.add(d.cs); ls.set("cartStores", [...cartStores]); renderCart(); return; }
     if ("clear" in d) { const old = Object.keys(cart); cart = {}; saveCart(); renderCart(); old.forEach(updateCard); return; }
@@ -270,7 +305,7 @@
       const next = cur === "dark" ? "light" : "dark"; document.documentElement.dataset.theme = next; ls.set("theme", next);
     }
     if (t.id === "clear-search") { F.q = ""; refresh(); $("search").focus(); }
-    if (t.id === "reset") { Object.assign(F, { q: "", cat: "All", sort: "rel", stores: new Set(), multi: false, sale: false, fav: false, pmin: null, pmax: null }); refresh(); }
+    if (t.id === "reset") { Object.assign(F, { q: "", cat: "All", sub: "", sort: "rel", stores: new Set(), multi: false, sale: false, fav: false, pmin: null, pmax: null }); refresh(); }
   });
   $("scrim").addEventListener("click", () => setCart(false));
   document.addEventListener("keydown", (e) => {
@@ -341,7 +376,6 @@
     if (e.target.closest("[data-clear-recent]")) { ls.set("recent", []); closeSugg(); return; }
     const li = e.target.closest("li[data-i]"); if (li) choose(+li.dataset.i);
   });
-  $("category").addEventListener("change", (e) => { F.cat = e.target.value; refresh(); });
   $("sort").addEventListener("change", (e) => { F.sort = e.target.value; refresh(); });
   $("f-multi").addEventListener("change", (e) => { F.multi = e.target.checked; refresh(); });
   $("f-sale").addEventListener("change", (e) => { F.sale = e.target.checked; refresh(); });

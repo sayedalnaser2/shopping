@@ -23,11 +23,13 @@
 
 <section class="hero" id="hero"><p class="notice" id="notice"></p><div class="stats" id="stats"></div></section>
 
+<nav class="catbar" aria-label="Categories"><div id="catrail" class="rail"></div><div id="subrail" class="rail subs" hidden></div></nav>
+
 <main>
   <section id="catalog">
+    <div id="tiles" class="tiles" hidden></div>
     <div class="toolbar">
       <div class="row1">
-        <select id="category" aria-label="Category"></select>
         <select id="sort" aria-label="Sort">
           <option value="rel">Sort: Best match</option>
           <option value="save">Biggest saving (BD)</option>
