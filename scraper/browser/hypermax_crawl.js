@@ -15,9 +15,12 @@
     // (pack counts, shade numbers, item codes) onto the price, e.g. "60" + "3.250" -> 603.25. Fixed 2026-10-27.
     const priceIn = (d, c) => {
       const w = d.createTreeWalker(c, 4), found = [];
-      for (let n = w.nextNode(); n && found.length < 2; n = w.nextNode()) {
-        const m = n.data.match(/^\s*(\d+\.\d{3})\s*(?:BHD)?\s*$/);
-        if (m) found.push(m);
+      const t = []; for (let n = w.nextNode(); n; n = w.nextNode()) { const s = n.data.trim(); if (s) t.push(s); }
+      // non-food pages split the price into separate text pieces: "4" "." "020" "BHD"
+      for (let i = 0; i < t.length && found.length < 2; i++) {
+        let m = t[i].match(/^(\d+\.\d{3})(?:\s*BHD)?$/);
+        if (m) { found.push(m); continue; }
+        if (/^\d+$/.test(t[i]) && t[i + 1] === "." && /^\d{3}$/.test(t[i + 2] || "")) { found.push([null, t[i] + "." + t[i + 2]]); i += 2; }
       }
       return found;
     };
