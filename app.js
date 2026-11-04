@@ -28,9 +28,10 @@
     }
     const spread = n > 1 ? max - min : 0;
     return { id: r[0], name: r[1], size: r[2] || "", category: r[3], image: r[4], prices, was, links, n, min, max, cheapest, spread,
-      spreadPct: n > 1 && max > 0 ? spread / max : 0, suspect: n > 1 && min > 0 && max / min > 3, disc, discBD, _q: (r[1] + " " + (r[2] || "")).toLowerCase() };
+      spreadPct: n > 1 && max > 0 ? spread / max : 0, suspect: n > 1 && min > 0 && max / min > 3, disc, discBD };
   });
   const byId = Object.fromEntries(ALL.map((p) => [p.id, p]));
+  Search.build(ALL); // search engine (search.js): ALL[i] is document i
   const ACTIVE = STORES.filter((s) => ALL.some((p) => p.prices[s.id] != null));
 
   /* ---------- header facts ---------- */
@@ -75,7 +76,8 @@
     history.replaceState(null, "", s ? "#" + s : location.pathname + location.search);
   }
   function syncControls() {
-    $("search").value = F.q; $("category").value = F.cat; $("sort").value = F.sort;
+    const sb = $("search"); if (document.activeElement !== sb || sb.value.trim() !== F.q) sb.value = F.q;
+    $("category").value = F.cat; $("sort").value = F.sort;
     $("f-multi").checked = F.multi; $("f-sale").checked = F.sale; $("f-fav").checked = F.fav;
     $("pmin").value = F.pmin ?? ""; $("pmax").value = F.pmax ?? "";
     $("clear-search").hidden = !F.q;
@@ -93,9 +95,9 @@
     az: (a, b) => a.name.localeCompare(b.name),
   };
   let filtered = [], shown = PAGE;
+  let lastRes = null;
   function applyFilters() {
-    const words = F.q.toLowerCase().split(/\s+/).filter(Boolean);
-    let list = ALL.filter((p) => {
+    const pass = (p) => {
       if (F.cat !== "All" && p.category !== F.cat) return false;
       if (F.multi && p.n < 2) return false;
       if (F.sale && !p.disc) return false;
@@ -103,20 +105,20 @@
       for (const s of F.stores) if (p.prices[s] == null) return false;
       if (F.pmin != null && p.min < F.pmin) return false;
       if (F.pmax != null && p.min > F.pmax) return false;
-      for (const w of words) if (!p._q.includes(w)) return false;
       return true;
-    });
+    };
+    lastRes = F.q.trim() ? Search.search(F.q) : null;
+    let list = [];
+    if (lastRes) { for (const i of lastRes.ids) if (pass(ALL[i])) list.push(ALL[i]); } // already in best-match order
+    else list = ALL.filter(pass);
     if (F.sort !== "rel") {
       if (F.sort === "save" || F.sort === "savepct") list = list.filter((p) => p.n > 1 && !p.suspect);
       if (F.sort === "disc") list = list.filter((p) => p.disc > 0);
       list = list.sort(SORTS[F.sort]);
-    } else if (words.length) {
-      const q = words.join(" ");
-      const rank = (p) => (p._q.startsWith(q) ? 0 : p._q.includes(" " + words[0]) ? 1 : 2) * 10 - Math.min(p.n, 5);
-      list = list.map((p) => [rank(p), p]).sort((a, b) => a[0] - b[0]).map((x) => x[1]);
     }
     filtered = list; shown = PAGE;
   }
+  const hl = (name) => (lastRes ? Search.highlight(name, lastRes.terms, esc) : esc(name));
 
   const pic = (p) => p.image
     ? `<img class="pic" loading="lazy" referrerpolicy="no-referrer" alt="" src="${esc(p.image)}">`
@@ -139,7 +141,7 @@
       ? `<span class="stepper"><button data-dec="${esc(p.id)}" aria-label="Remove one">−</button><b>${q}</b><button data-inc="${esc(p.id)}" aria-label="Add one">+</button></span>`
       : `<button class="add" data-inc="${esc(p.id)}">+ Add to cart</button>`;
     return `<article class="card" data-card="${esc(p.id)}"><button class="fav" data-fav="${esc(p.id)}" aria-pressed="${favs.has(p.id)}" aria-label="Favourite" title="Favourite">${favs.has(p.id) ? "♥" : "♡"}</button>` +
-      `<div class="head">${pic(p)}<div><h3>${esc(p.name)}</h3><small>${esc(p.size)}</small><div class="badges">${badges}</div></div></div>` +
+      `<div class="head">${pic(p)}<div><h3>${hl(p.name)}</h3><small>${esc(p.size)}</small><div class="badges">${badges}</div></div></div>` +
       `<div class="plist">${rows}</div><div class="foot"><span class="hint">${p.n > 1 ? `Cheapest: ${esc(store[p.cheapest].short)}` : ""}</span>${act}</div></article>`;
   }
 
@@ -148,8 +150,10 @@
     const html = list.map(card).join("");
     if (append) $("products").insertAdjacentHTML("beforeend", html);
     else $("products").innerHTML = html || `<p class="empty" style="grid-column:1/-1">No products match. Try fewer words or press Reset.</p>`;
-    $("found").textContent = `${filtered.length.toLocaleString()} product${filtered.length === 1 ? "" : "s"}` +
-      (F.sort === "save" || F.sort === "savepct" ? " sold in 2+ shops (suspicious price gaps left out)" : "");
+    $("found").innerHTML = `${filtered.length.toLocaleString()} product${filtered.length === 1 ? "" : "s"}` +
+      (F.sort === "save" || F.sort === "savepct" ? " sold in 2+ shops (suspicious price gaps left out)" : "") +
+      (lastRes && lastRes.corrected ? ` · showing results for <b>${esc(lastRes.corrected)}</b>` : "") +
+      (lastRes && lastRes.partial && filtered.length ? ` · best matches first, then close matches that miss a word` : "");
     $("sentinel").innerHTML = filtered.length > shown ? `<button class="more" data-more>Show more (${(filtered.length - shown).toLocaleString()} left)</button>` : "";
   }
   function refresh() { applyFilters(); syncControls(); writeHash(); renderProducts(); }
@@ -280,8 +284,63 @@
       const d = document.createElement("div"); d.className = "pic none"; d.textContent = "🛒"; t.replaceWith(d);
     }
   }, true);
-  let timer;
-  $("search").addEventListener("input", (e) => { clearTimeout(timer); timer = setTimeout(() => { F.q = e.target.value.trim(); refresh(); }, 160); });
+  /* ---------- search box: suggestions, recent searches, keyboard ---------- */
+  let timer, sugg = [], active = -1;
+  const box = $("sugg"), input = $("search");
+  const recent = () => ls.get("recent", []);
+  function remember(q) {
+    q = (q || "").trim(); if (q.length < 2) return;
+    ls.set("recent", [q, ...recent().filter((x) => x.toLowerCase() !== q.toLowerCase())].slice(0, 8));
+  }
+  function closeSugg() { box.hidden = true; active = -1; input.setAttribute("aria-expanded", "false"); }
+  function showSugg() {
+    const v = input.value;
+    if (!v.trim()) {
+      sugg = recent().map((t) => ({ type: "recent", text: t }));
+    } else sugg = Search.suggest(v, 8);
+    if (!sugg.length) { closeSugg(); return; }
+    const head = !v.trim() ? `<li class="sg-head" role="presentation">Recent searches <button type="button" data-clear-recent>Clear</button></li>` : "";
+    box.innerHTML = head + sugg.map((x, i) => {
+      const d = x.idx != null ? ALL[x.idx] : null;
+      const icon = x.type === "recent" ? "🕘" : x.type === "word" ? "🔎" : "";
+      const thumb = d ? (d.image ? `<img loading="lazy" referrerpolicy="no-referrer" alt="" src="${esc(d.image)}">` : `<span class="th">🛒</span>`) : `<span class="th">${icon}</span>`;
+      const label = d ? Search.highlight(x.text, lastTerms(v), esc) : esc(x.text);
+      return `<li role="option" data-i="${i}" id="sg-${i}">${thumb}<span class="tx">${label}</span>` +
+        (d ? `<small>${d.n > 1 ? d.n + " shops · " : ""}from ${d.min.toFixed(3)}</small>` : "") + `</li>`;
+    }).join("");
+    box.hidden = false; active = -1; input.setAttribute("aria-expanded", "true");
+  }
+  const lastTerms = (v) => Search.search(v.trim()).terms;
+  function choose(i) {
+    const x = sugg[i]; if (!x) return;
+    input.value = x.text; F.q = x.text.trim(); remember(F.q); closeSugg(); refresh();
+  }
+  function move(delta) {
+    if (box.hidden) { showSugg(); return; }
+    const items = box.querySelectorAll("li[data-i]"); if (!items.length) return;
+    active = (active + delta + items.length) % items.length;
+    items.forEach((li, k) => { li.classList.toggle("on", k === active); if (k === active) { input.setAttribute("aria-activedescendant", li.id); li.scrollIntoView({ block: "nearest" }); } });
+  }
+  input.addEventListener("input", (e) => {
+    clearTimeout(timer); showSugg();
+    timer = setTimeout(() => { F.q = e.target.value.trim(); refresh(); }, 140);
+  });
+  input.addEventListener("focus", showSugg);
+  input.addEventListener("blur", () => { setTimeout(closeSugg, 120); remember(F.q); });
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowDown") { e.preventDefault(); move(1); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); move(-1); }
+    else if (e.key === "Enter") {
+      e.preventDefault();
+      if (active >= 0 && !box.hidden) choose(active);
+      else { clearTimeout(timer); F.q = input.value.trim(); remember(F.q); closeSugg(); refresh(); input.blur(); }
+    } else if (e.key === "Escape") { if (!box.hidden) { closeSugg(); e.stopPropagation(); } }
+  });
+  box.addEventListener("mousedown", (e) => {
+    e.preventDefault();
+    if (e.target.closest("[data-clear-recent]")) { ls.set("recent", []); closeSugg(); return; }
+    const li = e.target.closest("li[data-i]"); if (li) choose(+li.dataset.i);
+  });
   $("category").addEventListener("change", (e) => { F.cat = e.target.value; refresh(); });
   $("sort").addEventListener("change", (e) => { F.sort = e.target.value; refresh(); });
   $("f-multi").addEventListener("change", (e) => { F.multi = e.target.checked; refresh(); });
