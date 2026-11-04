@@ -106,7 +106,14 @@
   let filtered = [], shown = PAGE;
   let lastRes = null, catCount = {}, subCount = {};
   function applyFilters() {
+    lastRes = F.q.trim() ? Search.search(F.q) : null;
+    const iv = lastRes && lastRes.intent;   // "milk under 1", "rice at ramez": price and shop words typed in the search box
     const pass = (p) => {
+      if (iv) {
+        if (iv.max != null && p.min > iv.max + 1e-9) return false;
+        if (iv.min != null && p.min < iv.min - 1e-9) return false;
+        for (const s of iv.stores) if (p.prices[s] == null) return false;
+      }
       if (F.multi && p.n < 2) return false;
       if (F.sale && !p.disc) return false;
       if (F.fav && !favs.has(p.id)) return false;
@@ -115,7 +122,6 @@
       if (F.pmax != null && p.min > F.pmax) return false;
       return true;
     };
-    lastRes = F.q.trim() ? Search.search(F.q) : null;
     let base = [];
     if (lastRes) { for (const i of lastRes.ids) if (pass(ALL[i])) base.push(ALL[i]); } // already in best-match order
     else base = ALL.filter(pass);
@@ -167,6 +173,7 @@
     else $("products").innerHTML = html || `<p class="empty" style="grid-column:1/-1">No products match. Try fewer words or press Reset.</p>`;
     $("found").innerHTML = `${filtered.length.toLocaleString()} product${filtered.length === 1 ? "" : "s"}` +
       (F.sort === "save" || F.sort === "savepct" ? " sold in 2+ shops (suspicious price gaps left out)" : "") +
+      (lastRes && lastRes.intent ? ` · <b>${[lastRes.intent.min != null && lastRes.intent.max != null ? `${lastRes.intent.min.toFixed(3)}–${lastRes.intent.max.toFixed(3)} BD` : lastRes.intent.max != null ? `under ${lastRes.intent.max.toFixed(3)} BD` : lastRes.intent.min != null ? `over ${lastRes.intent.min.toFixed(3)} BD` : "", ...lastRes.intent.stores.map((id) => "at " + store[id].short)].filter(Boolean).map(esc).join(" · ")}</b>` : "") +
       (lastRes && lastRes.corrected ? ` · showing results for <b>${esc(lastRes.corrected)}</b>` : "") +
       (lastRes && lastRes.partial && filtered.length ? ` · best matches first, then close matches that miss a word` : "");
     $("sentinel").innerHTML = filtered.length > shown ? `<button class="more" data-more>Show more (${(filtered.length - shown).toLocaleString()} left)</button>` : "";
@@ -337,17 +344,18 @@
     const head = !v.trim() ? `<li class="sg-head" role="presentation">Recent searches <button type="button" data-clear-recent>Clear</button></li>` : "";
     box.innerHTML = head + sugg.map((x, i) => {
       const d = x.idx != null ? ALL[x.idx] : null;
-      const icon = x.type === "recent" ? "🕘" : x.type === "word" ? "🔎" : "";
+      const icon = x.type === "recent" ? "🕘" : x.type === "word" ? "🔎" : x.type === "cat" ? (CAT_ICON[x.cat] || "📂") : "";
       const thumb = d ? (d.image ? `<img loading="lazy" referrerpolicy="no-referrer" alt="" src="${esc(d.image)}">` : `<span class="th">🛒</span>`) : `<span class="th">${icon}</span>`;
       const label = d ? Search.highlight(x.text, lastTerms(v), esc) : esc(x.text);
       return `<li role="option" data-i="${i}" id="sg-${i}">${thumb}<span class="tx">${label}</span>` +
-        (d ? `<small>${d.n > 1 ? d.n + " shops · " : ""}from ${d.min.toFixed(3)}</small>` : "") + `</li>`;
+        (d ? `<small>${d.n > 1 ? d.n + " shops · " : ""}from ${d.min.toFixed(3)}</small>` : x.type === "cat" ? `<small>category · ${x.count.toLocaleString()}</small>` : "") + `</li>`;
     }).join("");
     box.hidden = false; active = -1; input.setAttribute("aria-expanded", "true");
   }
   const lastTerms = (v) => Search.search(v.trim()).terms;
   function choose(i) {
     const x = sugg[i]; if (!x) return;
+    if (x.type === "cat") { input.value = ""; F.q = ""; F.cat = x.cat; F.sub = x.sub || ""; closeSugg(); window.__catScroll = true; refresh(); $("catalog").scrollIntoView({ block: "start" }); return; }
     input.value = x.text; F.q = x.text.trim(); remember(F.q); closeSugg(); refresh();
   }
   function move(delta) {

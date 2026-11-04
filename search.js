@@ -121,7 +121,7 @@
   }
 
   /* ---------- the index ---------- */
-  let N = 0, docs = [];
+  let N = 0, docs = [], catList = [];
   let termId = new Map(), terms = [], df = [], post = [];       // name+size postings
   let catPost = new Map();                                       // category words -> doc ids
   let docTerms = [];                                             // term ids of each product's name, in order
@@ -148,12 +148,19 @@
       }
       docTerms[d] = ids; nameLen[d] = Math.min(255, toks.length);
       boost[d] = 1 + 0.25 * Math.min(Math.max(p.n - 1, 0), 3); // products that can be compared across shops come first
-      for (const c of tokenize(p.category || "")) {
+      for (const c of tokenize((p.category || "") + " " + (p.sub || ""))) {
         let a = catPost.get(c); if (!a) catPost.set(c, (a = []));
         if (a[a.length - 1] !== d) a.push(d);
       }
     }
     post = tmp.map((a) => Int32Array.from(a));
+    // category / sub-category list for "jump to category" suggestions
+    const cm = new Map();
+    for (const p of list) {
+      if (!p.category) continue;
+      for (const key of [p.category + "|", p.category + "|" + (p.sub || "")]) { if (key.endsWith("|") && key !== p.category + "|") continue; cm.set(key, (cm.get(key) || 0) + 1); }
+    }
+    catList = [...cm].map(([k, count]) => { const [main, sub] = k.split("|"); return { main, sub, count, name: sub || main, tok: tokenize(sub || main) }; });
     sizeNums = new Map();
     terms.forEach((t, id) => {
       const m = /^(\d+(?:\.\d+)?)(g|ml)$/.exec(t);
@@ -208,13 +215,30 @@
   }
 
   /* ---------- query parsing ---------- */
+  /* "milk under 1", "rice 5kg below 3.5 bd", "between 1 and 2", "at lulu": price and shop words become filters, not search words */
+  const SHOPS = { lulu: "lulu", carrefour: "carrefour", hypermax: "carrefour", hypermart: "carrefour", ramez: "ramez", jazira: "jazira", aljazira: "jazira",
+    "al jazira": "jazira", megamart: "megamart", "mega mart": "megamart" };
+  const NOUNIT = "(?!\\s*(?:l\\b|ltr|lt\\b|litre|liter|ml|kg|gm?\\b|gms|gr\\b|pcs?\\b|pack|x\\b|cl\\b|oz|lb))";
+  function intents(q) {
+    let s = " " + q.toLowerCase() + " ", min = null, max = null; const stores = [];
+    const num = "(\\d+(?:\\.\\d+)?)", cur = "(?:\\s*(?:bd|bhd|dinars?|d\\b))?", pre = "(?:bd\\s*|bhd\\s*)?";
+    s = s.replace(new RegExp("\\sbetween\\s+" + pre + num + cur + "\\s*(?:and|to|-)\\s*" + pre + num + cur + NOUNIT, "g"), (m, a, b) => { min = Math.min(+a, +b); max = Math.max(+a, +b); return " "; });
+    s = s.replace(new RegExp("\\s(?:under|below|less than|cheaper than|up to|upto|within|max(?:imum)?|not more than)\\s+" + pre + num + cur + NOUNIT, "g"), (m, a) => { max = +a; return " "; });
+    s = s.replace(new RegExp("\\s<=?\\s*" + pre + num + cur + NOUNIT, "g"), (m, a) => { max = +a; return " "; });
+    s = s.replace(new RegExp("\\s(?:over|above|more than|at least|min(?:imum)?|from)\\s+" + pre + num + cur + NOUNIT, "g"), (m, a) => { min = +a; return " "; });
+    s = s.replace(new RegExp("\\s>=?\\s*" + pre + num + cur + NOUNIT, "g"), (m, a) => { min = +a; return " "; });
+    s = s.replace(/\s(?:at|in|from|@|sold at|available at|only at)\s*(al jazira|aljazira|mega mart|megamart|hypermax|hypermart|carrefour|jazira|ramez|lulu)(?=\s)/g, (m, n) => { const id = SHOPS[n]; if (!stores.includes(id)) stores.push(id); return " "; });
+    return { text: s.trim().replace(/\s+/g, " "), min, max, stores };
+  }
   function parse(q) {
     const neg = [], pos = [];
+    const keep = [];
     for (const part of q.trim().split(/\s+/)) {
       if (!part) continue;
       if (part.length > 1 && part[0] === "-") { for (const t of tokenize(part.slice(1))) neg.push(t); }
-      else for (const t of tokenize(part)) pos.push(t);
+      else keep.push(part);
     }
+    for (const t of tokenize(keep.join(" "))) pos.push(t);   // together, so "1.5 litre" or "6 x 330 ml" are read as one size
     return { pos, neg, endsNeg: /\s-\S*$/.test(" " + q.trim()) };
   }
 
@@ -263,10 +287,18 @@
   }
 
   function run(q, asYouType) {
-    const { pos, neg, endsNeg } = parse(q);
+    const it = intents(q);
+    const intent = { min: it.min, max: it.max, stores: it.stores };
+    const hasIntent = it.min != null || it.max != null || it.stores.length > 0;
+    const { pos, neg, endsNeg } = parse(hasIntent ? it.text : q);
     if (endsNeg) asYouType = false;
-    const empty = { ids: [], terms: new Set(), words: [], partial: false, corrected: null, exact: 0 };
-    if (!pos.length) return empty;
+    const empty = { ids: [], terms: new Set(), words: [], partial: false, corrected: null, exact: 0, intent: hasIntent ? intent : null };
+    if (!pos.length) {
+      if (!hasIntent) return empty;
+      // only a price / shop was typed ("under 1 bd"): everything qualifies, products sold in more shops first
+      empty.ids = Array.from({ length: N }, (_, i) => i).sort((a, b) => boost[b] - boost[a] || a - b);
+      return empty;
+    }
     const { exps, corrected } = expand(pos, asYouType);
 
     // 1. per word: which products contain a matching term, and how well
@@ -314,6 +346,8 @@
     }
 
     // 3. refine order: brand first, phrase, conciseness, shops
+    let catHit = null;
+    for (const x of exps) { const c = catPost.get(x.t); if (c) { if (!catHit) catHit = new Set(); for (const d of c) catHit.add(d); } }
     const qTerms = new Map(); // termId -> word index (best weight)
     exps.forEach((x, i) => { for (const [id, w] of x.e) { const o = qTerms.get(id); if (!o || o.w < w) qTerms.set(id, { i, w }); } });
     const list = [];
@@ -333,6 +367,7 @@
       if (best >= exps.length && exps.length > 1) score += 1;
       score *= 1 + 0.9 / (1 + Math.max(0, nameLen[d] - exps.length) * 0.55);       // concise names first
       score *= boost[d];
+      if (catHit && catHit.has(d)) score *= 1.22;     // the query word is also the product's category ("coffee" in Beverages > Coffee)
       if (full === exps.length) exact++;
       list.push([score, d]);
     }
@@ -349,7 +384,7 @@
       const raw = q.trim().split(/\s+/).filter((w) => w[0] !== "-");
       correctedText = exps.map((x, i) => (x.how === "fuzzy" ? fixes.shift() : raw.length === exps.length ? raw[i] : x.t)).join(" ");
     }
-    return { ids: list.map((x) => x[1]), terms: matched, words: pos, partial, corrected: correctedText, exact };
+    return { ids: list.map((x) => x[1]), terms: matched, words: pos, partial, corrected: correctedText, exact, intent: hasIntent ? intent : null };
   }
 
   /* ---------- suggestions ---------- */
@@ -369,6 +404,16 @@
         let ids = prefixTerms(lt[0], 12).filter((id) => df[id] >= 2 && terms[id] !== lt[0]).slice(0, 4);
         if (!ids.length && termId.get(lt[0]) === undefined) ids = fuzzyTerms(lt[0], 3).map((x) => x[1]);
         for (const id of ids) push({ type: "word", text: (head ? head + " " : "") + terms[id] });
+      }
+    }
+    // category shortcuts: typing "coffee" or "baby wipes" also offers the category itself
+    const qt = tokenize(trimmed).filter((t) => !isNum(t));
+    if (qt.length && !/\s-\S/.test(" " + trimmed)) {
+      const hits = catList.filter((c) => c.tok.length && qt.every((t, i) => c.tok.some((x) => x === t || (i === qt.length - 1 && !hasTrailingSpace && t.length >= 2 && x.startsWith(t)))))
+        .sort((x, y) => (x.sub ? 0 : 1) - (y.sub ? 0 : 1) || y.count - x.count).slice(0, 3);
+      for (const c of hits) {
+        push({ type: "cat", text: c.sub ? c.sub + " in " + c.main : c.main, cat: c.main, sub: c.sub, count: c.count });
+        if (!hasTrailingSpace && c.tok.length === qt.length && c.tok.every((t, i) => t === qt[i])) out.unshift(out.pop());   // an exact category name comes first
       }
     }
     const r = search(trimmed, { asYouType: !hasTrailingSpace });
