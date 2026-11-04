@@ -267,7 +267,7 @@
       }
       if (!e.size) {
         const fz = fuzzyTerms(t, 6);
-        for (const [dd, id] of fz) add(id, dd === 1 ? 0.62 : 0.58);
+        fz.forEach(([dd, id], k) => add(id, k === 0 ? (dd === 1 ? 0.95 : 0.9) : 0.3)); // the closest, most common word is "what you meant"; the rest barely count
         if (fz.length) { how = "fuzzy"; corrected = true; }
       }
       exps.push({ t, e, cap, how: how || "none", size: /^\d+(?:\.\d+)?(g|ml|pc|oz|lb|gal|cm|mm)$/.test(t) });
@@ -276,10 +276,14 @@
   }
 
   /* ---------- search ---------- */
+  // "Like Hypermax" profile: pure text relevance in the way hypermax.com.bh orders its results (no shop-count push, first word counts more,
+  // no category push). Tuned against scraper/hx_compare.js. Hypermax also ranks by sales, which we cannot see.
+  let HX = false; const HXT = { first: 1, shopK: 0.05, cat: 1.0, noPrimary: true };
+  function setProfile(p) { HX = p === "hx"; }
   let cache = { q: null, res: null };
   function search(q, opts) {
     const asYouType = !opts || opts.asYouType !== false;
-    const key = q + "|" + asYouType;
+    const key = q + "|" + asYouType + "|" + HX;
     if (cache.q === key) return cache.res;
     const res = run(q, asYouType);
     cache = { q: key, res };
@@ -362,12 +366,13 @@
         run = prev === p - 1 && h.i >= 0 ? run + 1 : 1; prev = p;
         if (run > best) best = run;
       }
-      if (firstHit) score += 0.6;
+      const T = (typeof window !== "undefined" && window.__T) || (HX ? HXT : {});
+      if (firstHit) score += T.first != null ? T.first : 0.6;
       if (best > 1) score += 0.5 * (best - 1);
       if (best >= exps.length && exps.length > 1) score += 1;
-      score *= 1 + 0.9 / (1 + Math.max(0, nameLen[d] - exps.length) * 0.55);       // concise names first
-      score *= boost[d];
-      if (catHit && catHit.has(d)) score *= 1.22;     // the query word is also the product's category ("coffee" in Beverages > Coffee)
+      score *= 1 + (T.conc != null ? T.conc : 0.9) / (1 + Math.max(0, nameLen[d] - exps.length) * (T.concK != null ? T.concK : 0.55));       // concise names first
+      score *= 1 + (T.shopK != null ? T.shopK : 1) * (boost[d] - 1);   // sold in more shops: only a tiebreak, so the order follows relevance like Hypermax's own search
+      if (catHit && catHit.has(d)) score *= T.cat != null ? T.cat : 1.22;     // the query word is also the product's category ("coffee" in Beverages > Coffee)
       if (full === exps.length) exact++;
       list.push([score, d]);
     }
@@ -375,7 +380,7 @@
     // What was the shopper most likely looking for? The category / sub-category that dominates the best matches is the "primary"
     // one: its products come first ("milk" -> Dairy > Milk before condensed milk, milk chocolate or milk powder scoops), then the other choices.
     let primary = null;
-    if (list.length >= 6) {
+    if (list.length >= 6 && !(HX || (typeof window !== "undefined" && window.__T && window.__T.noPrimary))) {
       const w = new Map(); let tot = 0;
       for (let k = 0; k < Math.min(60, list.length); k++) {
         const p = docs[list[k][1]], key = p.category + "|" + (p.sub || ""), wt = 1 / (1 + k / 12);
@@ -458,5 +463,5 @@
     return out + esc(name.slice(last));
   }
 
-  window.Search = { build, search, suggest, highlight, tokenize };
+  window.Search = { build, search, suggest, highlight, tokenize, setProfile };
 })();

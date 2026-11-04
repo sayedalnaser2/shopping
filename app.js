@@ -71,7 +71,7 @@
     const h = new URLSearchParams(location.hash.slice(1));
     F.q = h.get("q") || ""; F.cat = cats.includes(h.get("cat")) ? h.get("cat") : "All";
     F.sub = F.cat !== "All" && SUBS[F.cat] && SUBS[F.cat].has(h.get("sub")) ? h.get("sub") : "";
-    F.sort = ["rel", "save", "savepct", "disc", "low", "high", "az"].includes(h.get("sort")) ? h.get("sort") : "rel";
+    F.sort = ["rel", "hx", "save", "savepct", "disc", "low", "high", "az"].includes(h.get("sort")) ? h.get("sort") : "rel";
     F.multi = h.get("multi") === "1"; F.sale = h.get("sale") === "1";
     F.stores = new Set((h.get("at") || "").split(",").filter((x) => ACTIVE.some((s) => s.id === x)));
     F.pmin = h.get("min") ? +h.get("min") : null; F.pmax = h.get("max") ? +h.get("max") : null;
@@ -106,6 +106,7 @@
   let filtered = [], shown = PAGE;
   let lastRes = null, catCount = {}, subCount = {};
   function applyFilters() {
+    Search.setProfile(F.sort === "hx" ? "hx" : "");
     lastRes = F.q.trim() ? Search.search(F.q) : null;
     const iv = lastRes && lastRes.intent;   // "milk under 1", "rice at ramez": price and shop words typed in the search box
     const pass = (p) => {
@@ -132,7 +133,7 @@
       if (p.category === F.cat) subCount[p.sub] = (subCount[p.sub] || 0) + 1;
     }
     let list = F.cat === "All" ? base : base.filter((p) => p.category === F.cat && (!F.sub || p.sub === F.sub));
-    if (F.sort !== "rel") {
+    if (F.sort !== "rel" && F.sort !== "hx") {
       if (F.sort === "save" || F.sort === "savepct") list = list.filter((p) => p.n > 1 && !p.suspect);
       if (F.sort === "disc") list = list.filter((p) => p.disc > 0);
       list = list.sort(SORTS[F.sort]);
