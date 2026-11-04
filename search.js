@@ -278,7 +278,7 @@
   /* ---------- search ---------- */
   // "Like Hypermax" profile: pure text relevance in the way hypermax.com.bh orders its results (no shop-count push, first word counts more,
   // no category push). Tuned against scraper/hx_compare.js. Hypermax also ranks by sales, which we cannot see.
-  let HX = false; const HXT = { first: 1, shopK: 0.05, cat: 1.0, noPrimary: true };
+  let HX = false; const HXT = { first: 1, shopK: 0.02, noPrimary: true, tf: 0.6 };
   function setProfile(p) { HX = p === "hx"; }
   let cache = { q: null, res: null };
   function search(q, opts) {
@@ -357,12 +357,12 @@
     const list = [];
     let exact = 0;
     for (const [d, base] of cand) {
-      const ids = docTerms[d]; let score = base, run = 0, best = 0, prev = -2, firstHit = false, full = 0;
+      const ids = docTerms[d]; let score = base, run = 0, best = 0, prev = -2, firstHit = false, full = 0, hits = 0;
       for (let p = 0; p < ids.length; p++) {
         const h = qTerms.get(ids[p]);
         if (!h) { run = 0; continue; }
         if (p === 0 && h.i === 0) firstHit = true;
-        if (h.w >= 0.99) full++;
+        if (h.w >= 0.99) { full++; hits++; }
         run = prev === p - 1 && h.i >= 0 ? run + 1 : 1; prev = p;
         if (run > best) best = run;
       }
@@ -372,6 +372,7 @@
       if (best >= exps.length && exps.length > 1) score += 1;
       score *= 1 + (T.conc != null ? T.conc : 0.9) / (1 + Math.max(0, nameLen[d] - exps.length) * (T.concK != null ? T.concK : 0.55));       // concise names first
       score *= 1 + (T.shopK != null ? T.shopK : 1) * (boost[d] - 1);   // sold in more shops: only a tiebreak, so the order follows relevance like Hypermax's own search
+      if ((T.tf != null ? T.tf : 0.25) && hits > exps.length) score *= 1 + (T.tf != null ? T.tf : 0.25) * (hits - exps.length);   // a query word repeated in the name ("Ahmad Tea English Tea") = about that thing (term frequency)
       if (catHit && catHit.has(d)) score *= T.cat != null ? T.cat : 1.22;     // the query word is also the product's category ("coffee" in Beverages > Coffee)
       if (full === exps.length) exact++;
       list.push([score, d]);
@@ -380,7 +381,7 @@
     // What was the shopper most likely looking for? The category / sub-category that dominates the best matches is the "primary"
     // one: its products come first ("milk" -> Dairy > Milk before condensed milk, milk chocolate or milk powder scoops), then the other choices.
     let primary = null;
-    if (list.length >= 6 && !(HX || (typeof window !== "undefined" && window.__T && window.__T.noPrimary))) {
+    if (list.length >= 6 && !(((HX && HXT.noPrimary)) || (typeof window !== "undefined" && window.__T && window.__T.noPrimary))) {
       const w = new Map(); let tot = 0;
       for (let k = 0; k < Math.min(60, list.length); k++) {
         const p = docs[list[k][1]], key = p.category + "|" + (p.sub || ""), wt = 1 / (1 + k / 12);
