@@ -51,10 +51,7 @@
   };
   const menu = await (await fetch(`/api/v1/menu?lang=en&${LOC}`)).json();
   const walk = (n) => [n, ...(n.subcategories || []).flatMap(walk)];
-  // the menu has more than one list (food AND non-food: beauty, home, cleaning, baby, electronics...), crawl them all
-  const tops = Object.values(menu).filter((v) => Array.isArray(v) && v.length && v[0] && v[0].id && v[0].name).flat();
-  console.log("menu lists:", Object.keys(menu).filter((k) => Array.isArray(menu[k])).join(", "), "-", tops.length, "top categories");
-  for (const top of tops) {
+  for (const top of menu.foodCategories) {
     for (const n of walk(top)) await crawl(n.id, top.name, n.name);
     console.log(top.name, "-> total", data.size);
   }
