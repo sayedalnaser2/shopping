@@ -25,7 +25,12 @@
     aluminium: "aluminum", flavour: "flavor", flavours: "flavor", colour: "color", colours: "color", fibre: "fiber", centre: "center",
     mozarella: "mozzarella", mozzerella: "mozzarella", parmesean: "parmesan", pringle: "pringles", ariel: "ariel", loreal: "loreal", lorial: "loreal",
     nutela: "nutella", pepsi: "pepsi", cocacola: "cola", coke: "cola", fanta: "fanta", cerelac: "cerelac", "cerelac": "cerelac", nestl: "nestle", nesle: "nestle",
-    colgat: "colgate", dettol: "dettol", detol: "dettol", pamper: "pampers", lipton: "lipton", liptone: "lipton", nido: "nido", almaraai: "almarai", almari: "almarai", cooky: "cookie", chily: "chili", tomatoe: "tomato" };
+    colgat: "colgate", dettol: "dettol", detol: "dettol", pamper: "pampers", lipton: "lipton", liptone: "lipton", nido: "nido", almaraai: "almarai", almari: "almarai", cooky: "cookie", chily: "chili", tomatoe: "tomato",
+    // misspellings found in the shops' own product names (scraper/search_eval.js): read as the real word everywhere
+    choclate: "chocolate", chocolat: "chocolate", chocklate: "chocolate", chickn: "chicken", chiken: "chicken", strawbery: "strawberry", strawberri: "strawberry",
+    orginal: "original", orignal: "original", chese: "cheese", cheesa: "cheese", sheese: "cheese", lavander: "lavender", parfume: "perfume", shampo: "shampoo",
+    cofee: "coffee", coffe: "coffee", yougurt: "yogurt", yoghurtt: "yogurt", bisquit: "biscuit", biscut: "biscuit", vanila: "vanilla", tomatos: "tomato", potatos: "potato",
+    tissu: "tissue", tisue: "tissue", detergant: "detergent", sugur: "sugar", diper: "diaper", dipers: "diaper" };
   // groups of words that mean the same thing to a shopper (stored in already-normalised form)
   const SYN_GROUPS = [
     ["chip", "crisp", "crisps"], ["soda", "soft drink", "fizzy"], ["diaper", "nappy", "napy"], ["tissue", "napkin", "kleenex"],
@@ -40,6 +45,18 @@
     ["deodorant", "deo", "antiperspirant"], ["toothpaste", "tooth paste"], ["toothbrush", "tooth brush"], ["handwash", "hand wash"], ["cornflakes", "corn flakes"],
     ["icecream", "ice cream"], ["babyfood", "baby food"], ["petfood", "pet food"], ["catfood", "cat food"], ["dogfood", "dog food"],
   ];
+
+  // Words that turn a product into a different product when they follow the searched word: "apple" -> apple JUICE,
+  // "potato" -> potato CHIPS, "milk" -> milk POWDER. Such products rank below the plain item unless the word was typed.
+  const DERIV = ["juice", "nectar", "drink", "chips", "crisps", "wedges", "fries", "ketchup", "paste", "puree", "sauce", "powder", "chocolate", "choco",
+    "cake", "biscuit", "cookie", "wafer", "candy", "bar", "soup", "stock", "cube", "seasoning", "masala", "spread", "jam", "syrup", "vinegar", "cider",
+    "essence", "oil", "shampoo", "soap", "lotion", "cream", "wipe", "rash", "yogurt", "milk", "laban", "strudel", "pie", "muffin", "croissant", "cereal",
+    "bite", "popcorn", "nugget", "burger", "frank", "sausage", "kibbeh", "strip", "pop", "mix", "premix", "dessert", "custard", "pudding", "noodle",
+    "candle", "freshener", "bread", "rusk", "toast", "bun", "flavour", "flavor", "flavoured", "flavored", "smoothie", "icecream", "ice", "jelly", "tea", "coffee", "kebab", "tikka", "meatball", "ball"];
+  // Product types that make a different product wherever they stand in the name ("Parle RUSK Milk", "Lusine Milk BREAD").
+  const ANYWHERE = ["rusk", "bread", "toast", "biscuit", "cookie", "wafer", "cake", "croissant", "muffin"];
+  // Flavour words: chocolate milk is still milk, but plain milk comes first when someone types "milk".
+  const FLAVOR = ["chocolate", "choco", "strawberry", "mango", "banana", "vanilla", "caramel", "flavour", "flavor", "flavoured", "flavored", "date", "honey", "mint", "lemon", "orange"];
 
   function stem(w) {
     if (w.length > 4 && /^[a-z]+$/.test(w)) {
@@ -130,6 +147,7 @@
   let sizeNums = new Map();                                      // "1.8" -> size terms such as 1800g
   let boost = null;                                              // sold-in-more-shops boost per doc
   let nameLen = null;
+  let derivIds = new Set(), flavorIds = new Set(), anyIds = new Set();   // term ids of DERIV / FLAVOR / ANYWHERE words
 
   function build(list) {
     docs = list; N = list.length;
@@ -177,6 +195,10 @@
     sortedIds = order; sortedTerms = order.map((i) => terms[i]);
     byLen = [];
     for (let i = 0; i < terms.length; i++) { const l = terms[i].length; (byLen[l] ||= []).push(i); }
+    derivIds = new Set(); flavorIds = new Set();
+    for (const w of DERIV) for (const t of tokenize(w)) { const id = termId.get(t); if (id !== undefined) derivIds.add(id); }
+    for (const w of FLAVOR) for (const t of tokenize(w)) { const id = termId.get(t); if (id !== undefined) flavorIds.add(id); }
+    for (const w of ANYWHERE) for (const t of tokenize(w)) { const id = termId.get(t); if (id !== undefined) anyIds.add(id); }
     cache = { q: null, res: null };
   }
   // does the name already say the size? then do not index the separate size field twice
@@ -269,6 +291,17 @@
         const fz = fuzzyTerms(t, 6);
         fz.forEach(([dd, id], k) => add(id, k === 0 ? (dd === 1 ? 0.95 : 0.9) : 0.3)); // the closest, most common word is "what you meant"; the rest barely count
         if (fz.length) { how = "fuzzy"; corrected = true; }
+      } else if (own !== undefined && df[own] <= 5 && !syn && !isNum(t) && t.length >= 5) {
+        // The typed word exists, but only in a few products ("chiken", "shampo", "cofee": the shops misspell too). If a far more common
+        // word is one typo away, that is what was meant: it leads, and the few literal matches stay in the list below it.
+        const fz = fuzzyTerms(t, 3).filter(([, id]) => id !== own && df[id] >= Math.max(20, 15 * df[own]));
+        if (fz.length) {
+          const fix = fz[0][1];
+          cap = idf(fix) * 1.05;
+          e.set(own, 0.6);
+          add(fix, 0.97);
+          how = "fuzzy"; corrected = true;
+        }
       }
       exps.push({ t, e, cap, how: how || "none", size: /^\d+(?:\.\d+)?(g|ml|pc|oz|lb|gal|cm|mm)$/.test(t) });
     });
@@ -278,7 +311,7 @@
   /* ---------- search ---------- */
   // "Like Hypermax" profile: pure text relevance in the way hypermax.com.bh orders its results (no shop-count push, first word counts more,
   // no category push). Tuned against scraper/hx_compare.js. Hypermax also ranks by sales, which we cannot see.
-  let HX = false; const HXT = { first: 1, shopK: 0.02, noPrimary: true, tf: 0.6 };
+  let HX = false; const HXT = { first: 1, shopK: 0.02, noPrimary: true, tf: 0.6, deriv: 1, flavor: 1 };
   function setProfile(p) { HX = p === "hx"; }
   let cache = { q: null, res: null };
   function search(q, opts) {
@@ -357,10 +390,16 @@
     const list = [];
     let exact = 0;
     for (const [d, base] of cand) {
-      const ids = docTerms[d]; let score = base, run = 0, best = 0, prev = -2, firstHit = false, full = 0, hits = 0;
+      const ids = docTerms[d]; let score = base, run = 0, best = 0, prev = -2, firstHit = false, full = 0, hits = 0, seenQ = false, deriv = false, flavor = false;
       for (let p = 0; p < ids.length; p++) {
         const h = qTerms.get(ids[p]);
-        if (!h) { run = 0; continue; }
+        if (!h) {
+          run = 0;
+          if ((seenQ && derivIds.has(ids[p])) || anyIds.has(ids[p])) deriv = true;    // "Apple JUICE", "Milk POWDER", "Milk RUSK": a different product than the word typed
+          if (flavorIds.has(ids[p])) flavor = true;           // "Chocolate Milk" for "milk"
+          continue;
+        }
+        seenQ = true;
         if (p === 0 && h.i === 0) firstHit = true;
         if (h.w >= 0.99) { full++; hits++; }
         run = prev === p - 1 && h.i >= 0 ? run + 1 : 1; prev = p;
@@ -374,6 +413,8 @@
       score *= 1 + (T.shopK != null ? T.shopK : 1) * (boost[d] - 1);   // sold in more shops: only a tiebreak, so the order follows relevance like Hypermax's own search
       if ((T.tf != null ? T.tf : 0.25) && hits > exps.length) score *= 1 + (T.tf != null ? T.tf : 0.25) * (hits - exps.length);   // a query word repeated in the name ("Ahmad Tea English Tea") = about that thing (term frequency)
       if (catHit && catHit.has(d)) score *= T.cat != null ? T.cat : 1.22;     // the query word is also the product's category ("coffee" in Beverages > Coffee)
+      if (deriv) score *= T.deriv != null ? T.deriv : 0.55;   // the plain item before what is made from it
+      if (flavor) score *= T.flavor != null ? T.flavor : 0.82;
       if (full === exps.length) exact++;
       list.push([score, d]);
     }
@@ -423,7 +464,10 @@
     if (!hasTrailingSpace && lastRaw.length >= 2 && !lastRaw.startsWith("-")) {
       const lt = tokenize(lastRaw);
       if (lt.length === 1 && !isNum(lt[0])) {
-        let ids = prefixTerms(lt[0], 12).filter((id) => df[id] >= 2 && terms[id] !== lt[0]).slice(0, 4);
+        // the word was a known misspelling ("chiken" -> chicken): offer the real word first
+        const plain = strip(lastRaw).replace(/[^\p{L}]/gu, "");
+        if (plain && lt[0] !== plain && lt[0] !== stem(plain) && termId.get(lt[0]) !== undefined) push({ type: "word", text: (head ? head + " " : "") + lt[0] });
+        let ids = prefixTerms(lt[0], 12).filter((id) => df[id] >= 3 && terms[id] !== lt[0]).slice(0, 4);
         if (!ids.length && termId.get(lt[0]) === undefined) ids = fuzzyTerms(lt[0], 3).map((x) => x[1]);
         for (const id of ids) push({ type: "word", text: (head ? head + " " : "") + terms[id] });
       }

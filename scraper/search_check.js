@@ -10,6 +10,10 @@ const T = [
   ["toothpaste", "toothpaste"], ["colgate", "colgate"], ["pepsi 6x330ml", "pepsi"], ["water 1.5 litre", "water"], ["حليب", "milk"], ["laban", "laban"], ["chicken breast", "chicken"],
   ["iphone", "iphone"], ["tide detergent", "tide"], ["milk under 1", "milk"], ["rice at ramez", "rice"], ["nutela", "nutella"], ["coca cola", "cola"], ["almarai milk -powder", "almarai"],
   ["shampoo dandruff", "shampoo"], ["tuna", "tuna"], ["lipton tea bags", "lipton"], ["dates", "date"], ["eggs", "egg"],
+  // plain items before what is made from them, and typos the shops share
+  ["banana", "cat:Fruit & Vegetables > Fruit"], ["apple", "cat:Fruit & Vegetables > Fruit"], ["potato", "cat:Fruit & Vegetables > Vegetables"],
+  ["tomato", "cat:Fruit & Vegetables > Vegetables"], ["fresh milk", "fresh milk"], ["chiken", "chicken"], ["shampo", "shampoo"], ["cofee", "coffee"],
+  ["choclate", "chocolate"], ["apple juice", "apple juice"], ["potato chips", "chips"], ["chicken burger", "burger"],
 ];
 let bad = 0;
 for (const [q, want] of T) {
