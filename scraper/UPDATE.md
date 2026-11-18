@@ -1,6 +1,6 @@
 # Updating all shop data
 
-On the computer that has Chrome (Windows: double-click `scraper/update_all.bat`; Mac/Linux: `scraper/update_all.sh`):
+On the computer that has Chrome run ONE command from the repository folder: `update` (Windows, or double-click update.bat) or `./update.sh` (Mac/Linux). It is the same as `python scraper/update.py --crawl`.
 
 1. **`crawl_all.py`** opens Chrome, visits Lulu, Hypermax, Megamart, Al Jazira and Ramez one after another and runs each shop's
    crawl script from `scraper/browser/`. Results go to `scraper/incoming/<shop>.json`. Leave the window visible (about 1.5–2 h in total).

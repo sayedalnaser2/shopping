@@ -8,7 +8,8 @@ and uses every file that is newer than the store's current data (several Hyperma
  - New rows replace old ones with the same product id. Products the crawl did NOT return are kept as "last known" (price from the
    last crawl that saw them) for --keep-days days (default 60), then dropped, so delisted products disappear eventually.
  - Nothing is invented: a price only comes from a shop page.
-Usage:  python3 scraper/update.py [--from DIR ...] [--keep-days 60] [--rebuild] [--no-push] [--no-commit]
+Usage:  python3 scraper/update.py --crawl      <- ONE command: crawl all five shops in Chrome, then update everything
+        python3 scraper/update.py [--from DIR ...] [--keep-days 60] [--rebuild] [--no-push] [--no-commit]
 """
 import argparse, json, os, shutil, subprocess, sys, time
 from datetime import date, datetime
@@ -142,10 +143,16 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--from", dest="dirs", action="append", help="folder with crawl files (repeatable). Default: scraper/incoming and ~/Downloads")
     ap.add_argument("--keep-days", type=int, default=60)
+    ap.add_argument("--crawl", nargs="*", metavar="SHOP", help="first crawl the shops in Chrome (all five, or the ones named), then update")
     ap.add_argument("--rebuild", action="store_true", help="rematch and rebuild even if there are no new crawl files")
     ap.add_argument("--no-commit", action="store_true")
     ap.add_argument("--no-push", action="store_true")
     a = ap.parse_args()
+    if a.crawl is not None:
+        if subprocess.run([sys.executable, "-c", "import playwright"], capture_output=True).returncode:
+            sh([sys.executable, "-m", "pip", "install", "--quiet", "playwright"])
+        if sh([sys.executable, "crawl_all.py", *a.crawl]).returncode:
+            print("crawl_all reported a problem - continuing with whatever files were saved")
     dirs = [Path(d).expanduser() for d in a.dirs] if a.dirs else [INCOMING, Path.home() / "Downloads"]
     print("looking in:", ", ".join(map(str, dirs)))
     changed = [s for s in STORES if (print(f"[{s}]"), ingest(s, dirs, a.keep_days))[1]]
