@@ -2,3 +2,5 @@ __pycache__/
 *.pyc
 probe_*/
 scraper/raw/
+scraper/incoming/
+scraper/.chrome-profile/
